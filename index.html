@@ -390,6 +390,12 @@ const FAMILIES = {
     delta: { did: "B05A", bytes: 2, f: 1,     o: 0 },
     avgT:  { did: "B056", bytes: 1, f: 0.5,   o: -40 },
   },
+  // Mahindra candidates (XUV400-era; INGLO unverified — use the DID scanner)
+  mah: {
+    packV: { did: "E001", bytes: 2, f: 0.1, o: 0 },
+    packI: { did: "E002", bytes: 2, f: 0.1, o: -500 },
+    maxV:  { did: "E003", bytes: 2, f: 1,   o: 0 },
+  },
   // BYD Blade — little-endian
   byd: {
     soc:   { did: "0005", bytes: 1, f: 1,   o: 0 },
@@ -421,6 +427,8 @@ const PROFILES = [
   { id: "mg_zs_ev",          name: "MG ZS EV (experimental)",    make: "MG",  kwh: 50.3, cells: 96, chem: "LFP 96S", hdr: "745", rx: "74D", fam: "mg" },
   { id: "mg_comet_ev",       name: "MG Comet (experimental)",    make: "MG",  kwh: 17.3, cells: 48, chem: "LFP 48S", hdr: "745", rx: "74D", fam: "mg" },
   { id: "byd_atto_3",        name: "BYD Atto 3 (experimental)",  make: "BYD", kwh: 60.5, cells: 126, chem: "LFP Blade", hdr: "781", rx: "789", fam: "byd" },
+  { id: "mahindra_xuv400",   name: "XUV400 (experimental)",      make: "Mahindra", kwh: 39.4, cells: 96,  chem: "NMC 96S",   hdr: "7E4", rx: "7EC", fam: "mah" },
+  { id: "mahindra_inglo",    name: "BE 6 / XEV 9e / 9S (discovery)", make: "Mahindra", kwh: 79.0, cells: 0, chem: "LFP blade", hdr: "7E4", rx: "7EC", fam: "mah" },
 ];
 const VIN_TABLE = [
   [/^MAT832/, "tata_punch_ev_mr"], [/^MAT83[35]/, "tata_punch_ev_lr"], [/^MAT834/, "tata_punch_ev_40"],
@@ -653,7 +661,7 @@ function setProfile(prof, how) {
   $("detHow").textContent = how;
   $("dashCar").textContent = prof.name.split(" (")[0];
   $("dashSub").textContent = `BMS Live · ${prof.hdr}/${prof.rx}`;
-  $("vPackSpec").textContent = `${prof.kwh} kWh · ${prof.cells}S ${prof.chem.split(" ")[0]}`;
+  $("vPackSpec").textContent = `${prof.kwh} kWh · ` + (prof.cells ? `${prof.cells}S ${prof.chem.split(" ")[0]}` : prof.chem);
 }
 function onAdapterLost() {
   S.polling = false;
