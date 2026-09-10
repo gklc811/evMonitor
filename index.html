@@ -459,7 +459,7 @@ class Elm {
 
   async reconnectSilent() {
     if (!navigator.bluetooth.getDevices) return false;
-    const savedId = localStorage.getItem("evm_device");
+    const savedId = store.get("evm_device");
     if (!savedId) return false;
     const devs = await navigator.bluetooth.getDevices();
     const dev = devs.find(d => d.id === savedId);
@@ -496,7 +496,7 @@ class Elm {
       }
     });
     this.dev = dev; this.wr = pair.wr; this.connected = true;
-    localStorage.setItem("evm_device", dev.id);
+    store.set("evm_device", dev.id);
   }
 
   send(cmd, timeout = 2200) {
@@ -558,6 +558,10 @@ const S = {
   lastOdoAt: 0,
 };
 const $ = id => document.getElementById(id);
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+};
 function logLine(msg, cls) {
   const el = $("log"); if (!el) return;
   const d = document.createElement("div"); if (cls) d.className = cls; d.textContent = msg;
@@ -589,7 +593,7 @@ async function connectFlow(silent) {
     step("stElm", "ok", "CAN 500k · ELM ready");
 
     /* detect */
-    let vin = null, profId = localStorage.getItem("evm_profile");
+    let vin = null, profId = store.get("evm_profile");
     step("stVin", "on");
     const r09 = await elm.send("0902", 2500);
     vin = vinFrom(udsPayload(r09, "49", "02"));
@@ -640,7 +644,7 @@ function vinFrom(bytes) {
 }
 function setProfile(prof, how) {
   S.profile = prof;
-  localStorage.setItem("evm_profile", prof.id);
+  store.set("evm_profile", prof.id);
   $("selProfile").value = prof.id;
   $("detCard").classList.remove("hidden");
   $("detName").textContent = prof.name;
@@ -770,11 +774,11 @@ function finalizeRec() {
   };
   const all = getReports(); all.unshift(report);
   while (all.length > 20) all.pop();
-  localStorage.setItem("evm_reports", JSON.stringify(all));
+  store.set("evm_reports", JSON.stringify(all));
   logLine("charge report saved — top ΔV " + (report.top && report.top.delta != null ? report.top.delta : "?") + " mV", "ok");
   showReport(report);
 }
-function getReports() { try { return JSON.parse(localStorage.getItem("evm_reports")) || []; } catch (e) { return []; } }
+function getReports() { try { return JSON.parse(store.get("evm_reports")) || []; } catch (e) { return []; } }
 
 /* ============================ Rendering ============================ */
 function fmt(v, dp) { return v == null || isNaN(v) ? "—" : v.toFixed(dp); }
@@ -1051,7 +1055,7 @@ $("termIn").addEventListener("keydown", e => { if (e.key === "Enter") $("btnSend
 
 /* restore profile + compat check */
 (function init() {
-  const saved = localStorage.getItem("evm_profile");
+  const saved = store.get("evm_profile");
   const p = PROFILES.find(x => x.id === saved) || PROFILES[0];
   setProfile(p, saved ? "remembered from last session" : "default — connect to auto-detect");
   if (!navigator.bluetooth) {
