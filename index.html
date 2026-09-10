@@ -640,7 +640,10 @@ async function connectFlow(silent) {
     const r = await elm.reconnectSilent();
     if (!r.ok) {
       logLine("silent reconnect: " + r.reason);
-      if (silent) { step("stAdapter", "fail", "Adapter — tap connect (" + r.reason + ")"); return false; }
+      if (r.reason.indexOf("getDevices") >= 0) {
+        $("connHint").textContent = "One-time fix for chooser-free reconnect: type chrome://flags in the address bar → enable “Web Bluetooth new permissions backend” → restart Chrome → pair once more.";
+      }
+      if (silent) { step("stAdapter", "fail", "Adapter — tap connect" + (r.reason.indexOf("getDevices") >= 0 ? " (see note below)" : " (" + r.reason + ")")); return false; }
       step("stAdapter", "on", "Pick your adapter in the chooser…");
       await elm.pick();
     }
