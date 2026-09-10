@@ -82,6 +82,23 @@
   #log .tx { color: var(--accent); } #log .err { color: var(--crit); } #log .ok { color: var(--good); }
   .rowline { display: flex; justify-content: space-between; font-size: 11.5px; padding: 4px 0; }
   .rowline span:first-child { color: var(--sec); }
+
+  /* ---------- landscape / wide layout ---------- */
+  @media (orientation: landscape) and (min-width: 640px) {
+    body { max-width: 940px; }
+    #viewDash { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; align-content: start; }
+    #viewDash > .hdr, #viewDash > .foot { grid-column: 1 / -1; }
+    #viewDash > .foot { margin-top: 4px; }
+    #nightWrap {
+      display: grid; grid-template-columns: 1.15fr 1fr; gap: 8px 28px; align-content: center;
+      grid-template-areas: "h h" "soc rows" "pw rows" "f f";
+    }
+    #nightWrap > :nth-child(1) { grid-area: h; }
+    #nightWrap > :nth-child(2) { grid-area: soc; padding: 8px 0 0 !important; }
+    #nightWrap > :nth-child(3) { grid-area: pw; }
+    #nightWrap > :nth-child(4) { grid-area: rows; border: none; align-self: center; }
+    #nightWrap > :nth-child(5) { grid-area: f; margin-top: 8px !important; }
+  }
 </style>
 </head>
 <body>
@@ -232,6 +249,15 @@
     </div>
   </div>
 
+  <div class="card" style="padding: 11px 14px; display: flex; justify-content: space-between; align-items: center;">
+    <div class="lbl tile-lbl" style="font-size: 11px;">12V battery</div>
+    <div style="display: flex; align-items: baseline; gap: 6px;">
+      <span class="num" style="font-size: 20px; font-weight: 600;" id="vLv">—</span>
+      <span class="num" style="font-size: 11px; color: var(--sec);">V</span>
+      <span class="num" style="font-size: 10px; color: var(--mut);" id="vLvSub"></span>
+    </div>
+  </div>
+
   <div class="card" style="padding: 10px 14px; display: flex; justify-content: space-between; align-items: center;">
     <div><div class="lbl" style="font-size: 9.5px; color: var(--mut);">Session out</div><span class="num" style="font-size: 14px; font-weight: 600;" id="vEOut">—</span><span class="num" style="font-size: 10px; color: var(--sec);"> kWh</span></div>
     <div><div class="lbl" style="font-size: 9.5px; color: var(--mut);">In</div><span class="num" style="font-size: 14px; font-weight: 600;" id="vEIn">—</span><span class="num" style="font-size: 10px; color: var(--sec);"> kWh</span></div>
@@ -239,7 +265,7 @@
     <div style="text-align: right;"><div class="lbl" style="font-size: 9.5px; color: var(--mut);">Trip</div><span class="num" style="font-size: 14px; font-weight: 600;" id="vTrip">—</span><span class="num" style="font-size: 10px; color: var(--sec);"> km</span></div>
   </div>
 
-  <div style="margin-top: auto; display: flex; justify-content: space-between; align-items: center; padding: 2px;">
+  <div class="foot" style="margin-top: auto; display: flex; justify-content: space-between; align-items: center; padding: 2px;">
     <span class="num" style="font-size: 10px; color: var(--mut);" id="pollStats">—</span>
     <button class="ghost" style="min-height: 30px; padding: 4px 10px; font-size: 11px;" id="btnTools">Tools</button>
   </div>
@@ -276,6 +302,7 @@
       <div class="rowline"><span class="lbl" style="font-size: 11px; color: #55627a;">ΔV peak (95–100% window)</span><span class="num" id="nPeak" style="color: #55627a;">— below 95%</span></div>
       <div class="rowline"><span class="lbl" style="font-size: 11px; color: #55627a;">Cells max / min</span><span class="num" id="nCells" style="color: #b7c3d6;">—</span></div>
       <div class="rowline"><span class="lbl" style="font-size: 11px; color: #55627a;">Temp max / min</span><span class="num" id="nTemps" style="color: #b7c3d6;">—</span></div>
+      <div class="rowline"><span class="lbl" style="font-size: 11px; color: #55627a;">12V battery</span><span class="num" id="nLv" style="color: #b7c3d6;">—</span></div>
     </div>
 
     <div style="margin-top: auto; display: flex; flex-direction: column; gap: 10px;">
@@ -478,7 +505,7 @@ class Elm {
 
   async attach(dev) {
     const gatt = await dev.gatt.connect();
-    dev.addEventListener("gattserverdisconnected", () => { this.connected = false; if (this.onDisconnect) this.onDisconnect(); });
+    dev.ongattserverdisconnected = () => { this.connected = false; if (this.onDisconnect) this.onDisconnect(); };
     let pair = null;
     for (const c of BLE_UUIDS) {
       try {
@@ -665,8 +692,36 @@ function setProfile(prof, how) {
 }
 function onAdapterLost() {
   S.polling = false;
-  $("connDot").classList.remove("on"); $("connTxt").textContent = "Lost";
-  logLine("adapter disconnected", "err");
+  $("connDot").classList.remove("on"); $("connTxt").textContent = "Reconnecting…";
+  logLine("adapter disconnected — auto-reconnect armed", "err");
+  scheduleReconnect();
+}
+
+/* silent auto-reconnect: retry every 8 s for up to 10 min, no chooser */
+let reconTimer = null;
+function scheduleReconnect() {
+  if (reconTimer) return;
+  let tries = 0;
+  reconTimer = setInterval(async () => {
+    if (elm.connected) { clearInterval(reconTimer); reconTimer = null; return; }
+    if (document.visibilityState !== "visible") return;
+    if (++tries > 75) { clearInterval(reconTimer); reconTimer = null; $("connTxt").textContent = "Lost"; return; }
+    try {
+      if (await elm.reconnectSilent()) {
+        clearInterval(reconTimer); reconTimer = null;
+        await quickInit();
+        logLine("reconnected · session restored", "ok");
+        $("connTxt").textContent = "Connected";
+        if (!S.polling) pollLoop();
+      }
+    } catch (e) {}
+  }, 8000);
+}
+async function quickInit() {
+  for (const c of ["ATE0", "ATL0", "ATS0", "ATH0", "ATCAF1", "ATSP6", "ATST64"]) await elm.send(c, 800);
+  await elm.send("ATSH" + S.profile.hdr, 600);
+  await elm.send("ATCRA" + S.profile.rx, 600);
+  await elm.send("1003", 1200);
 }
 
 /* ============================ Polling ============================ */
@@ -791,6 +846,12 @@ function getReports() { try { return JSON.parse(store.get("evm_reports")) || [];
 
 /* ============================ Rendering ============================ */
 function fmt(v, dp) { return v == null || isNaN(v) ? "—" : v.toFixed(dp); }
+function lvStatus(v) {
+  if (v > 13.0)  return { label: "DCDC float", color: "var(--good)", bad: false, tag: " · float" };
+  if (v < 11.8)  return { label: "critical",   color: "var(--crit)", bad: true,  tag: " · LOW" };
+  if (v < 12.15) return { label: "low",        color: "var(--warn)", bad: true,  tag: " · low" };
+  return { label: "resting", color: "var(--ink)", bad: false, tag: "" };
+}
 function render() {
   const t = S.t, d = liveDelta();
   if (S.night) {
@@ -804,6 +865,8 @@ function render() {
     $("nCells").textContent = (t.maxV != null && t.minV != null)
       ? `${(t.maxV / 1000).toFixed(3)} #${t.maxN ?? "?"} · ${(t.minV / 1000).toFixed(3)} #${t.minN ?? "?"}` : "—";
     $("nTemps").textContent = (t.maxT != null || t.minT != null) ? `${fmt(t.maxT, 0)} / ${fmt(t.minT, 0)} °C` : "—";
+    $("nLv").textContent = t.lv == null ? "—" : t.lv.toFixed(2) + " V" + lvStatus(t.lv).tag;
+    $("nLv").style.color = t.lv != null && lvStatus(t.lv).bad ? "var(--crit)" : "#b7c3d6";
     $("nEta").textContent = etaText();
     /* recorder status */
     if (S.rec) {
@@ -837,7 +900,13 @@ function render() {
   $("vDelta").style.color = d == null ? "var(--sec)" : d > 100 ? "var(--crit)" : d > 40 ? "var(--warn)" : "var(--good)";
   $("deltaBar").style.width = Math.min(100, (d || 0)) + "%";
   $("deltaBar").style.background = $("vDelta").style.color;
-  $("vBal").textContent = "Balancing: " + (t.bal == null ? "—" : (t.bal ? "active" : "idle"));
+  // native balance indicator — raw value until state meanings are mapped
+  $("vBal").textContent = "Balance: " + (t.bal == null ? "—" :
+    `raw ${t.bal} · 0x${Math.round(t.bal).toString(16).padStart(2, "0").toUpperCase()}`);
+  const lvS = t.lv == null ? null : lvStatus(t.lv);
+  $("vLv").textContent = fmt(t.lv, 2);
+  $("vLv").style.color = lvS ? lvS.color : "var(--ink)";
+  $("vLvSub").textContent = lvS ? lvS.label : "";
   $("vMaxT").textContent = fmt(t.maxT, 0); $("vMinT").textContent = fmt(t.minT, 0); $("vAvgT").textContent = fmt(t.avgT, 0);
   $("vMaxTN").textContent = "probe " + (t.maxTN ?? "—"); $("vMinTN").textContent = "probe " + (t.minTN ?? "—");
   $("vEOut").textContent = S.session.eOut.toFixed(2);

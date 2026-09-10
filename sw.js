@@ -1,4 +1,4 @@
-const CACHE = "evmonitor-v1";
+const CACHE = "evmonitor-v2";
 const SHELL = ["./", "index.html", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png"];
 
 self.addEventListener("install", e => {

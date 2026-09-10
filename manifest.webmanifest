@@ -4,7 +4,7 @@
   "description": "EV battery monitor over Bluetooth OBD2 — live BMS telemetry, charge watch and imbalance reports",
   "start_url": ".",
   "display": "standalone",
-  "orientation": "portrait",
+  "orientation": "any",
   "background_color": "#0b0e13",
   "theme_color": "#0b0e13",
   "icons": [
