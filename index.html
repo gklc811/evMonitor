@@ -84,7 +84,7 @@
   .rowline span:first-child { color: var(--sec); }
 
   /* ---------- landscape / wide layout ---------- */
-  @media (orientation: landscape) and (min-width: 640px) {
+  @media (orientation: landscape) and (min-width: 560px) {
     body { max-width: 940px; }
     #viewDash { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; align-content: start; }
     #viewDash > .hdr, #viewDash > .foot { grid-column: 1 / -1; }
@@ -1157,6 +1157,8 @@ $("termIn").addEventListener("keydown", e => { if (e.key === "Enter") $("btnSend
 
 /* restore profile + compat check */
 (function init() {
+  // release any inherited orientation lock (older installs had a portrait manifest)
+  try { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch (e) {}
   const saved = store.get("evm_profile");
   const p = PROFILES.find(x => x.id === saved) || PROFILES[0];
   setProfile(p, saved ? "remembered from last session" : "default — connect to auto-detect");
