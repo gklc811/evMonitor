@@ -1,0 +1,200 @@
+{
+  "_comment": "EV diagnostic protocol map. Sources: (1) evds.sayuk.cloud app.js (field-tested community values), (2) Tata TDS diagnostic databases extracted locally (KPD_EV_BMS.inf, BMS_TacoGotion.mdb, Kratos_BMS_DB.inf, CESL_EV_BMS.INF). All requests are UDS ReadDataByIdentifier (service 0x22) over ISO-TP CAN 500k unless noted. value = raw * factor + offset.",
+
+  "can_channels": {
+    "tata_ev":   { "bms_tx": "785", "bms_rx": "78D", "vecu_tx": "7E3", "vecu_rx": "7EB", "alt_vecu": "780", "session": "1003", "protocol": "11-bit 500k (ATSP6)" },
+    "mg_saic":   { "bms_tx": "745", "bms_rx": "74D", "gwm_tx": "744", "gwm_rx": "74C", "alt_bms": "7E4/7EC", "session": "1003" },
+    "byd":       { "bms_tx": "781", "bms_rx": "789", "session": "1003", "note": "16-bit DIDs in 0x00xx range, little-endian values" },
+    "hyundai_kia": { "bms_tx": "7E4", "bms_rx": "7EC", "session": "1003" },
+    "mahindra":  { "bms_tx": "7E4", "bms_rx": "7EC", "session": "1003" },
+    "obd_broadcast": { "tx": "7DF", "note": "standard OBD-II functional address; mode 09 02 = VIN, mode 01 A6 = odometer (some cars)" }
+  },
+
+  "discovery_scan_presets": {
+    "tata":             { "headers": ["785","7E3","781","7E0"], "sessions": ["1003","1001"] },
+    "mg_sgmw":          { "headers": ["744","7E3","781","780","7E4","745","7E2","7E0","705","18DAF100"], "sessions": ["1003","1001","10C0","1002"] },
+    "byd":              { "headers": ["781","7E0","7E2"], "sessions": ["1003","1001"] },
+    "hyundai_mahindra": { "headers": ["7E4","7E0","7E2"], "sessions": ["1003","1001"] },
+    "all":              { "headers": ["785","7E3","744","781","7E5","745","7E4","780","7E0","7E2","7E1","705","18DAF100","18DAF1F4","18DADBF1"], "sessions": ["1003","1001","10C0","1002","1086"] }
+  },
+
+  "tata_ev_bms_dids_field_tested": {
+    "_header": "ATSH785 / ATCRA78D, session 1003 — values as used live by evds.sayuk.cloud",
+    "3400": { "name": "Pack voltage",      "bytes": 2, "factor": 0.01, "offset": 0,    "unit": "V", "tds_says_factor": 0.1 },
+    "3401": { "name": "Pack current",      "bytes": 2, "factor": 0.1,  "offset": -320, "unit": "A" },
+    "3402": { "name": "SOC",               "bytes": 2, "factor": 0.1,  "offset": 0,    "unit": "%" },
+    "3403": { "name": "SOH",               "bytes": 2, "factor": 0.1,  "offset": 0,    "unit": "%" },
+    "3412": { "name": "Pack avg temp",     "bytes": 1, "factor": 1,    "offset": -40,  "unit": "C" },
+    "3415": { "name": "Max cell voltage",  "bytes": 2, "factor": 1,    "offset": 0,    "unit": "mV" },
+    "3417": { "name": "Min cell voltage",  "bytes": 2, "factor": 1,    "offset": 0,    "unit": "mV" },
+    "3419": { "name": "Max-V cell number", "bytes": 1, "factor": 1,    "offset": 0 },
+    "341A": { "name": "Min-V cell number", "bytes": 1, "factor": 1,    "offset": 0 },
+    "34D5": { "name": "Cell voltage delta","bytes": 2, "factor": 1,    "offset": 0,    "unit": "mV" },
+    "3409": { "name": "Aux 12V battery (per site; TDS says: max cell temp, 1 byte, -40 offset)", "bytes": 2, "factor": 0.01, "unit": "V", "conflict": true },
+    "340A": { "name": "HV insulation kOhm (per site; TDS says: max temp probe number)", "bytes": 2, "factor": 1, "unit": "kOhm", "conflict": true },
+    "A001_on_7E3": { "name": "Odometer (VECU, header 7E3 rx 7EB)", "bytes": 3, "unit": "km" }
+  },
+
+  "tata_ev_bms_dids_from_tds_kpd": {
+    "_header": "Extracted from TDS KPD_EV_BMS.inf tblDataIdentifiers + ValueType. value = (raw + offset) * resolution",
+    "3400": { "name": "BMS_BattCurVoltage", "bytes": 2, "res": 0.1,   "off": 0,     "unit": "V" },
+    "3401": { "name": "BMS_BattCurCurrent", "bytes": 2, "res": 0.1,   "off": -3200, "unit": "A" },
+    "3402": { "name": "BMS_SOC",            "bytes": 2, "res": 0.1,   "off": 0,     "unit": "%" },
+    "3403": { "name": "BMS_SOH",            "bytes": 2, "res": 0.1,   "off": 0,     "unit": "%" },
+    "3409": { "name": "BMS_MaxPresentTemp", "bytes": 1, "res": 1,     "off": -40,   "unit": "C" },
+    "340A": { "name": "BMS_MaxTempProbeNo", "bytes": 1, "res": 1,     "off": 0 },
+    "340B": { "name": "BMS_MinPresentTemp", "bytes": 1, "res": 1,     "off": -40,   "unit": "C" },
+    "340C": { "name": "BMS_MinTempProbeNo", "bytes": 1, "res": 1,     "off": 0 },
+    "3410": { "name": "BMS_InletTemp",      "bytes": 1, "res": 1,     "off": -40,   "unit": "C" },
+    "3411": { "name": "BMS_OutletTemp",     "bytes": 1, "res": 1,     "off": -40,   "unit": "C" },
+    "3412": { "name": "BMS_BattPresentAverageTemp", "bytes": 1, "res": 1, "off": -40, "unit": "C" },
+    "3415": { "name": "BMS_MaxCellVolt",    "bytes": 2, "res": 1,     "off": 0,     "unit": "mV" },
+    "3417": { "name": "BMS_MinCellVolt",    "bytes": 2, "res": 1,     "off": 0,     "unit": "mV" },
+    "3419": { "name": "BMS_MaxCellVoltNo",  "bytes": 1, "res": 1,     "off": 0 },
+    "341A": { "name": "BMS_MinCellVoltNo",  "bytes": 1, "res": 1,     "off": 0 },
+    "341B": { "name": "BMS_TotalTempProbeNumber", "bytes": 1, "res": 1, "off": 0 },
+    "3479": { "name": "BMS_CellBalanceStatus", "bytes": 1, "res": 1,  "off": 0 },
+    "347B": { "name": "BMS_MaxAllowContinusChrgCurr",   "bytes": 2, "res": 0.1, "off": 0, "unit": "A" },
+    "347C": { "name": "BMS_MaxAllowContinusDisChrgCurr","bytes": 2, "res": 0.1, "off": 0, "unit": "A" },
+    "3481": { "name": "VeDATM_U_NegBusbarVolt1", "bytes": 2, "res": 0.1,   "off": 0, "unit": "V" },
+    "3482": { "name": "VeDATM_U_PosBusbarVolt1", "bytes": 2, "res": 0.1,   "off": 0, "unit": "V" },
+    "3492": { "name": "BMS_PowerSupply voltage", "bytes": 2, "res": 0.001, "off": 0, "unit": "V" },
+    "34D5": { "name": "BMS_CellVolDiff",    "bytes": 2, "res": 1,     "off": 0,     "unit": "mV" }
+  },
+
+  "mg_saic_bms_dids": {
+    "_header": "MG ZS/Comet/Windsor — BMS on 745/74D (or 7E4/7EC), gateway GWM on 744/74C",
+    "B041": { "name": "Battery bus link voltage", "bytes": 2, "factor": 0.25, "unit": "V", "ecu": "GWM 744" },
+    "B042": { "name": "Pack voltage",   "bytes": 2, "factor": 0.25,  "unit": "V" },
+    "B043": { "name": "Pack current",   "bytes": 2, "factor": 0.025, "offset": -1000, "unit": "A" },
+    "B046": { "name": "SOC",            "bytes": 2, "factor": 0.1,   "unit": "%" },
+    "B056": { "name": "Battery temp",   "bytes": 1, "factor": 0.5,   "offset": -40, "unit": "C" },
+    "B058": { "name": "Max cell voltage","bytes": 2, "factor": 1,    "unit": "mV" },
+    "B059": { "name": "Min cell voltage","bytes": 2, "factor": 1,    "unit": "mV" },
+    "B05A": { "name": "Cell delta",     "bytes": 2, "factor": 1,     "unit": "mV" },
+    "B061": { "name": "SOH",            "bytes": 2, "factor": 0.01,  "unit": "%" },
+    "B062": { "name": "Max cell id",    "bytes": 1 },
+    "B063": { "name": "Min cell id",    "bytes": 1 },
+    "B065": { "name": "Coolant in temp","bytes": 1, "offset": -40,   "unit": "C" },
+    "B066": { "name": "Coolant out temp","bytes": 1, "offset": -40,  "unit": "C" },
+    "B703": { "name": "VCU HV contactor state", "bytes": 1, "ecu": "VCU" },
+    "B705": { "name": "VCU battery rail voltage", "bytes": 2, "factor": 0.1, "unit": "V", "ecu": "VCU" },
+    "B712": { "name": "VCU AC charge rate", "bytes": 2, "factor": 0.1, "unit": "kW", "ecu": "VCU" },
+    "B921": { "name": "Odometer (GWM 744/74C)", "bytes": 3, "unit": "km" }
+  },
+
+  "sgmw_windsor_dids": {
+    "0101": { "name": "BMS core status",   "bytes": 2 },
+    "0104": { "name": "Pack voltage & SOC","bytes": 2, "factor": 0.1, "unit": "V" },
+    "0108": { "name": "SOC & SOH",         "bytes": 2, "factor": 0.1, "unit": "%" },
+    "0109": { "name": "Pack voltage & current", "bytes": 2, "factor": 0.1 },
+    "0115": { "name": "Max/min cell voltage", "bytes": 2, "factor": 1, "unit": "mV" },
+    "0116": { "name": "Max/min cell number",  "bytes": 1 },
+    "0117": { "name": "Pack temperature range", "bytes": 1, "offset": -40, "unit": "C" },
+    "F40C": { "name": "12V aux battery",   "bytes": 2, "factor": 0.01, "unit": "V" },
+    "F40D": { "name": "HV isolation resistance", "bytes": 2, "factor": 1, "unit": "kOhm" },
+    "D100": { "name": "DC link bus voltage", "bytes": 2, "factor": 0.1, "unit": "V" }
+  },
+
+  "byd_blade_dids": {
+    "_header": "BYD on 781/789 — NOTE little-endian 16-bit values",
+    "0001": { "name": "Blade BMS status", "bytes": 2 },
+    "0005": { "name": "SOC",              "bytes": 1, "factor": 1, "unit": "%" },
+    "0008": { "name": "Pack voltage",     "bytes": 2, "factor": 0.1, "unit": "V", "endian": "little" },
+    "0009": { "name": "Pack current",     "bytes": 2, "formula": "(raw-5000)/10", "unit": "A", "endian": "little" },
+    "0012": { "name": "SOH",              "bytes": 1, "factor": 1, "unit": "%" },
+    "0015": { "name": "Max cell voltage", "bytes": 2, "factor": 1, "unit": "mV", "endian": "little" },
+    "0016": { "name": "Min cell voltage", "bytes": 2, "factor": 1, "unit": "mV", "endian": "little" },
+    "0017": { "name": "Cell delta",       "bytes": 2, "factor": 1, "unit": "mV", "endian": "little" },
+    "0020": { "name": "Battery temp",     "bytes": 1, "offset": -40, "unit": "C" }
+  },
+
+  "hyundai_kia_mahindra_dids": {
+    "0100": { "name": "BMS core status (Hyundai/Kia)", "bytes": 2 },
+    "0101": { "name": "Hyundai/Kia BMS block read (multi-frame: SOC, V, I, temps, max/min cell)", "note": "classic E-GMP block DID" },
+    "0105": { "name": "Battery cell array block", "bytes": 4, "note": "Hyundai per-cell voltage blocks live in 0102-0104 companions" },
+    "0106": { "name": "Battery temperature matrix", "bytes": 1, "offset": -40 },
+    "E001": { "name": "Mahindra pack voltage & SOC", "bytes": 2, "factor": 0.1, "unit": "V" },
+    "E002": { "name": "Mahindra pack current", "bytes": 2, "factor": 0.1, "offset": -500, "unit": "A" },
+    "E003": { "name": "Mahindra cell max & min", "bytes": 2, "factor": 1, "unit": "mV" }
+  },
+
+  "hyundai_kia_egmp_bms_blocks": {
+    "_header": "Hyundai/Kia (Kona, Ioniq 5, EV6, Creta EV likely) — BMS at 7E4/7EC, UDS 22. Community-documented (OVMS/open-source EV projects), the ONE platform with REAL per-cell voltages. Each block is a multi-frame response; cell voltage bytes scale x0.02 V.",
+    "0101": { "name": "BMS main block", "contents": "SOC x0.5, charging flags, pack current (signed 2B x0.1 A), pack voltage (2B x0.1 V), max/min cell temp, module temps, max cell V (1B x0.02), min cell V (1B x0.02), max/min cell numbers, aux 12V x0.1, cumulative charge/discharge kWh, operating time", "multiframe": true },
+    "0102": { "name": "Cell voltages 1-32",   "decode": "each payload byte x0.02 V", "multiframe": true },
+    "0103": { "name": "Cell voltages 33-64",  "decode": "each payload byte x0.02 V", "multiframe": true },
+    "0104": { "name": "Cell voltages 65-96",  "decode": "each payload byte x0.02 V", "multiframe": true },
+    "010A": { "name": "Cell voltages 97-128 (packs >96S, e.g. Ioniq 5/EV6)", "decode": "each payload byte x0.02 V", "multiframe": true },
+    "010B": { "name": "Cell voltages 129-160", "decode": "each payload byte x0.02 V", "multiframe": true },
+    "010C": { "name": "Cell voltages 161-192", "decode": "each payload byte x0.02 V", "multiframe": true },
+    "0105": { "name": "SOH block", "contents": "SOH 2B x0.1 %, max-deterioration cell #, display SOC", "multiframe": true },
+    "0106": { "name": "Cooling/misc block", "multiframe": true },
+    "_verify": "Byte offsets within blocks vary by model-year; verify against a known dashboard value on the actual car before shipping decoders."
+  },
+
+  "tata_ev_other_ecus": {
+    "_header": "Full DID tables in tata-ev-ecu-dids.json (508 DIDs from TDS KPD_EV_* databases). 29-bit ECU addresses from TDS comm tables (CV-style; passenger cars likely use 11-bit equivalents — probe both).",
+    "mcu":  { "dids": 158, "highlights": "torque limits, motor speed, coil/inverter temps, phase currents" },
+    "obc":  { "dids": 14,  "addr_29bit": "0x1BDAF1E5", "highlights": "$C610 set current, $C612 battery voltage, $C613 output current" },
+    "dcdc": { "dids": 21,  "highlights": "$C710 set current, $C712 battery voltage, $C713 output current" },
+    "hecu": { "dids": 188, "addr_29bit": "0x1BDAF927", "highlights": "vehicle speed/charge limits config, SOC derate thresholds; $01xx cell-voltage entries are SETPOINTS not live reads" },
+    "bcs":  { "dids": 40,  "addr_29bit": "0x1BDAF13A", "highlights": "$FD00/01 water in/out temp, $FD0D-0F compressor speed/current/power, $FD09 pump duty" },
+    "obc_dcdc_minda": { "dids": 87, "addr_29bit": "0x1BDAF18F", "highlights": "mirrors $30xx BMS set with confirmed scaling: $3017/$3018 cell V x0.01, $300D pack V x0.1, $300E current x0.1 -600" }
+  },
+
+  "vin_prefix_to_model": {
+    "_header": "VIN (from 0902 broadcast or 22F190) prefix -> vehicle profile. WMI: MAT=Tata, LGX=BYD, MZ7/LSJ/MAJ/MEX=MG/JSW-SAIC, KMH=Hyundai, MA1=Mahindra.",
+    "MAT832": "tata_punch_ev_mr (25 kWh 102S5P)",
+    "MAT833": "tata_punch_ev_lr (35 kWh 102S7P)",
+    "MAT834_MAT835": "tata_punch_ev_40 (40.4 kWh prismatic)",
+    "MAT620_MAT621": "tata_nexon_ev_prime (30.2 kWh 100S6P)",
+    "MAT622_MAT623": "tata_nexon_ev_max (40.5 kWh 104S8P)",
+    "MAT624": "tata_tiago_ev_mr (19.2 kWh 100S4P)",
+    "MAT625": "tata_tiago_ev / tigor LR (24 kWh 100S5P)",
+    "MAT635_MAT63x": "tata_nexon_ev_45 (45 kWh 96S prismatic)",
+    "MAT636": "tata_curvv_ev_55 (55 kWh 108S1P)",
+    "MAT61x": "tata_harrier_ev (65/75 kWh 108S/118S)",
+    "LGXC4": "byd_atto_3",
+    "LGXC22": "byd_seal",
+    "MZ72_or_*W*": "mg_windsor_ev",
+    "MZ7_LSJ_MAJ_MEX": "mg_zs_ev_50 (default MG)",
+    "KMH": "hyundai_ioniq_5 family",
+    "MA1": "mahindra_xuv400"
+  },
+
+  "standard_uds_dids": {
+    "F190": "VIN",
+    "F187": "Spare part / container part number",
+    "F188": "ECU software number",
+    "F189": "ECU software version",
+    "F191": "ECU hardware number",
+    "F18C": "Supplier ECU serial number",
+    "F1A1": "Parameter part number"
+  },
+
+  "ble_service_uuids_supported_by_site": [
+    "0000fff0-0000-1000-8000-00805f9b34fb",
+    "0000ffe0-0000-1000-8000-00805f9b34fb",
+    "000018f0-0000-1000-8000-00805f9b34fb",
+    "0000e0ff-0000-1000-8000-00805f9b34fb",
+    "e7810a71-73ae-499d-8c15-faa9aef0c3f2",
+    "49535343-fe7d-4ae5-8fa9-9fafd205e455",
+    "6e400001-b5a3-f393-e0a9-e50e24dcca9e",
+    "0000fee7-0000-1000-8000-00805f9b34fb",
+    "0000fff9-0000-1000-8000-00805f9b34fb",
+    "0000ff00-0000-1000-8000-00805f9b34fb",
+    "f000e0ff-0451-4000-b000-000000000000"
+  ],
+
+  "elm_init_sequence_used_by_site": ["ATE0", "ATL0", "ATH0", "ATCAF1", "ATSP6", "ATST64", "ATAR", "ATSH<hdr>", "ATCRA<rx>", "1003"],
+
+  "vehicle_autodetect_flow": [
+    "1. ATSH7DF + mode 09 02 -> VIN (standard OBD)",
+    "2. If no VIN: loop headers [7E3, 785, 744, 7E0, 781, 7E4, 745] -> 1003 -> 22F190",
+    "3. Match VIN prefix to profile",
+    "4. Fingerprint: ATSH785/ATCRA78D + 223402 replies '6234..' => Tata EV; ATSH781 + 220005 => BYD; ATSH744 + 22B046 => MG; 220108 => Windsor; 220101 => Hyundai/Kia"
+  ],
+
+  "important_finding_cell_voltages": "The Tata BMS only exposes MIN and MAX cell voltage + their cell numbers via documented DIDs. evds.sayuk.cloud renders the other cells as ESTIMATED (interpolated between min/max, labeled EST). Their extended probe checks DIDs 3420,3421,3422,3425,3430 hoping for multi-frame cell arrays. No public per-cell array DID is known for Tata EVs."
+}

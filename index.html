@@ -1,0 +1,1068 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0b0e13">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>evMonitor</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --bg: #0b0e13; --panel: #121824; --panel2: #1c2536; --border: #232d40;
+    --ink: #e8edf6; --sec: #93a1b8; --mut: #5c6b84;
+    --accent: #4d9fff; --good: #3fd68c; --crit: #f26d6d; --warn: #f5b73d;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+    max-width: 430px; margin: 0 auto; padding: env(safe-area-inset-top) 16px 14px;
+    display: flex; flex-direction: column; overflow-x: hidden;
+  }
+  .lbl { font-family: 'Barlow Condensed', 'Arial Narrow', sans-serif; text-transform: uppercase; letter-spacing: 0.09em; }
+  .num { font-variant-numeric: tabular-nums; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; }
+  button {
+    background: var(--panel2); color: var(--ink); border: 1px solid var(--border);
+    border-radius: 12px; padding: 13px 16px; cursor: pointer;
+    font-family: 'Barlow Condensed', sans-serif; font-size: 15px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.07em; min-height: 44px;
+  }
+  button.primary { background: var(--accent); color: #0b0e13; border-color: var(--accent); }
+  button.ghost { background: transparent; }
+  button:disabled { opacity: 0.4; }
+  select, input {
+    background: var(--bg); color: var(--ink); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px; font-family: inherit; font-size: 14px; min-height: 44px;
+  }
+  .hidden { display: none !important; }
+
+  /* ---------- connect view ---------- */
+  #viewConnect { display: flex; flex-direction: column; gap: 14px; padding-top: 22px; flex: 1; }
+  .brand { font-size: 24px; font-weight: 700; }
+  .brand-sub { font-size: 11px; color: var(--mut); font-weight: 500; }
+  .ladder { display: flex; flex-direction: column; gap: 11px; }
+  .step { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--sec); }
+  .step .ic { width: 17px; height: 17px; border-radius: 50%; border: 2px solid var(--border); flex: 0 0 auto; display: flex; align-items: center; justify-content: center; }
+  .step.on .ic { border-color: var(--accent); }
+  .step.ok .ic { border: none; background: var(--good); }
+  .step.ok .ic::after { content: ""; width: 5px; height: 9px; border: solid #0b0e13; border-width: 0 2px 2px 0; transform: rotate(42deg) translate(-1px, -1px); }
+  .step.fail .ic { border-color: var(--crit); }
+  .detected { border-color: #35507a !important; }
+
+  /* ---------- dashboard ---------- */
+  #viewDash { display: flex; flex-direction: column; gap: 11px; flex: 1; padding-top: 12px; }
+  .hdr { display: flex; justify-content: space-between; align-items: center; }
+  .pill { display: flex; align-items: center; gap: 7px; background: var(--panel); border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--crit); }
+  .dot.on { background: var(--good); box-shadow: 0 0 6px var(--good); }
+  .iconbtn { width: 36px; height: 36px; min-height: 36px; padding: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+  .tile-lbl { font-size: 10px; font-weight: 600; color: var(--mut); }
+  .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+  .meter { height: 8px; border-radius: 4px; background: var(--panel2); position: relative; overflow: hidden; }
+  .meter > div { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; background: var(--accent); }
+
+  /* ---------- night ---------- */
+  body.night { background: #000; }
+  body.night .card { background: transparent; border-color: #161b24; }
+  #nightWrap { display: flex; flex-direction: column; gap: 14px; flex: 1; padding-top: 14px; transition: opacity 1.6s; }
+  body.dim #nightWrap { opacity: 0.25; }
+
+  /* ---------- overlays ---------- */
+  .overlay { position: fixed; inset: 0; background: rgba(4,6,10,0.82); display: flex; align-items: flex-end; justify-content: center; z-index: 40; }
+  .sheet { background: var(--panel); border: 1px solid var(--border); border-radius: 18px 18px 0 0; width: 100%; max-width: 430px; max-height: 88vh; overflow-y: auto; padding: 18px 16px 26px; display: flex; flex-direction: column; gap: 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+  td, th { padding: 6px 6px; border-bottom: 1px solid var(--border); text-align: left; }
+  th { color: var(--mut); font-size: 10px; text-transform: uppercase; }
+  #log { background: #060a12; border: 1px solid var(--border); border-radius: 8px; font-size: 10.5px; padding: 8px; height: 150px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; color: #9fb0ca; }
+  #log .tx { color: var(--accent); } #log .err { color: var(--crit); } #log .ok { color: var(--good); }
+  .rowline { display: flex; justify-content: space-between; font-size: 11.5px; padding: 4px 0; }
+  .rowline span:first-child { color: var(--sec); }
+</style>
+</head>
+<body>
+
+<!-- ================= CONNECT VIEW ================= -->
+<div id="viewConnect">
+  <div>
+    <div class="brand lbl">evMonitor</div>
+    <div class="brand-sub lbl" id="connSub">EV battery monitor · BLE OBD2</div>
+  </div>
+  <div id="compatWarn" class="card" style="display:none; padding: 12px; border-color: #6b5416; color: var(--warn); font-size: 12px; line-height: 1.5;"></div>
+
+  <div class="card" style="padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+    <div class="lbl tile-lbl">Detection</div>
+    <div class="ladder" id="ladder">
+      <div class="step" id="stAdapter"><span class="ic"></span><span class="num">Adapter — tap connect</span></div>
+      <div class="step" id="stElm"><span class="ic"></span><span class="num">CAN 500k · ELM init</span></div>
+      <div class="step" id="stVin"><span class="ic"></span><span class="num">VIN read</span></div>
+      <div class="step" id="stBms"><span class="ic"></span><span class="num">BMS handshake</span></div>
+    </div>
+  </div>
+
+  <div class="card detected hidden" id="detCard" style="padding: 16px; display: flex; flex-direction: column; gap: 6px;">
+    <div class="lbl" style="font-size: 11px; font-weight: 600; color: var(--accent);">Detected vehicle</div>
+    <div class="lbl" style="font-size: 20px; font-weight: 700;" id="detName">—</div>
+    <div class="num" style="font-size: 11.5px; color: var(--sec);" id="detSpec">—</div>
+    <div class="num" style="font-size: 11px; color: var(--mut);" id="detHow">—</div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 10px; margin-top: auto;">
+    <button class="primary" id="btnConnect">Connect OBD adapter</button>
+    <button class="ghost hidden" id="btnStart">Start monitoring</button>
+    <div style="display: flex; gap: 8px; align-items: center;">
+      <select id="selProfile" style="flex: 1;"></select>
+    </div>
+    <div class="num" style="font-size: 10px; color: var(--mut); text-align: center;">Chrome / Edge on Android · BLE (v4+) ELM327 adapter</div>
+  </div>
+</div>
+
+<!-- ================= DASHBOARD (day) ================= -->
+<div id="viewDash" class="hidden">
+  <div class="hdr">
+    <div>
+      <div class="lbl" style="font-size: 19px; font-weight: 700;" id="dashCar">Punch EV</div>
+      <div class="lbl" style="font-size: 11px; font-weight: 500; color: var(--mut);" id="dashSub">BMS Live · 785/78D</div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <div class="pill"><span class="dot" id="connDot"></span><span class="lbl" style="font-size: 11px; font-weight: 600; color: var(--sec);" id="connTxt">—</span></div>
+      <button class="iconbtn" id="btnReports" title="Reports"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="#93a1b8" stroke-width="1.4"><path d="M3 2h10v12H3z M5.5 5.5h5 M5.5 8h5 M5.5 10.5h3"></path></svg></button>
+      <button class="iconbtn" id="btnNight" title="Night view"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="#93a1b8" stroke-width="1.4"><path d="M13.5 9.5A6 6 0 0 1 6.5 2.5a6 6 0 1 0 7 7z"></path></svg></button>
+    </div>
+  </div>
+
+  <div class="card" style="padding: 15px 16px 13px; display: flex; flex-direction: column; gap: 10px;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+      <div>
+        <div class="lbl tile-lbl">State of charge</div>
+        <div style="display: flex; align-items: baseline; gap: 4px;">
+          <span class="num" style="font-size: 44px; font-weight: 600; line-height: 1.1;" id="vSoc">—</span>
+          <span class="num" style="font-size: 17px; color: var(--sec);">%</span>
+        </div>
+      </div>
+      <div style="text-align: right;">
+        <div class="lbl tile-lbl">SOH</div>
+        <div style="display: flex; align-items: baseline; gap: 3px; justify-content: flex-end;">
+          <span class="num" style="font-size: 23px; font-weight: 600; color: var(--good);" id="vSoh">—</span>
+          <span class="num" style="font-size: 12px; color: var(--sec);">%</span>
+        </div>
+      </div>
+    </div>
+    <div class="meter"><div id="socBar" style="width: 0%;"></div></div>
+    <div style="display: flex; justify-content: space-between;">
+      <span class="num" style="font-size: 11px; color: var(--mut);" id="vKwhLeft">—</span>
+      <span class="num" style="font-size: 11px; color: var(--mut);" id="vPackSpec">—</span>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="card" style="padding: 11px 12px; display: flex; flex-direction: column; gap: 3px;">
+      <div class="lbl tile-lbl">Power</div>
+      <span class="num" style="font-size: 21px; font-weight: 600;" id="vPower">—</span>
+      <span class="num" style="font-size: 10px; color: var(--sec);" id="vPowerSub">kW</span>
+    </div>
+    <div class="card" style="padding: 11px 12px; display: flex; flex-direction: column; gap: 3px;">
+      <div class="lbl tile-lbl">Current</div>
+      <span class="num" style="font-size: 21px; font-weight: 600;" id="vCurr">—</span>
+      <span class="num" style="font-size: 10px; color: var(--sec);" id="vCurrSub">A</span>
+    </div>
+    <div class="card" style="padding: 11px 12px; display: flex; flex-direction: column; gap: 3px;">
+      <div class="lbl tile-lbl">Pack</div>
+      <span class="num" style="font-size: 21px; font-weight: 600;" id="vPackV">—</span>
+      <span class="num" style="font-size: 10px; color: var(--sec);">V · HV bus</span>
+    </div>
+  </div>
+
+  <div class="card" style="padding: 13px 16px; display: flex; flex-direction: column; gap: 11px;">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <div class="lbl tile-lbl" style="font-size: 11px;">Cell voltages</div>
+      <div style="display: flex; align-items: center; gap: 6px; background: var(--panel2); border-radius: 999px; padding: 4px 10px;">
+        <span class="lbl" style="font-size: 10px; font-weight: 600; color: var(--sec);" id="vBal">Balancing: —</span>
+      </div>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;">
+      <div style="border-left: 2px solid var(--good); padding-left: 10px;">
+        <div class="lbl tile-lbl">Max cell</div>
+        <div style="display: flex; align-items: baseline; gap: 4px;">
+          <span class="num" style="font-size: 23px; font-weight: 600;" id="vMaxV">—</span>
+          <span class="num" style="font-size: 12px; color: var(--sec);">V</span>
+        </div>
+        <div class="num" style="font-size: 11px; color: var(--good);" id="vMaxN">cell #—</div>
+      </div>
+      <div style="border-left: 2px solid var(--crit); padding-left: 10px;">
+        <div class="lbl tile-lbl">Min cell</div>
+        <div style="display: flex; align-items: baseline; gap: 4px;">
+          <span class="num" style="font-size: 23px; font-weight: 600;" id="vMinV">—</span>
+          <span class="num" style="font-size: 12px; color: var(--sec);">V</span>
+        </div>
+        <div class="num" style="font-size: 11px; color: var(--crit);" id="vMinN">cell #—</div>
+      </div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 6px;">
+      <div style="display: flex; justify-content: space-between; align-items: baseline;">
+        <span class="lbl tile-lbl">Imbalance ΔV</span>
+        <span><span class="num" style="font-size: 15px; font-weight: 600; color: var(--good);" id="vDelta">—</span>
+        <span class="num" style="font-size: 11px; color: var(--sec);"> mV · healthy &lt; 40</span></span>
+      </div>
+      <div class="meter" style="height: 6px;"><div id="deltaBar" style="background: var(--good); width: 0%;"></div></div>
+    </div>
+  </div>
+
+  <div class="card" style="padding: 13px 16px; display: flex; flex-direction: column; gap: 9px;">
+    <div class="lbl tile-lbl" style="font-size: 11px;">Battery temperature</div>
+    <div class="grid3">
+      <div>
+        <div class="lbl tile-lbl">Max</div>
+        <span class="num" style="font-size: 21px; font-weight: 600;" id="vMaxT">—</span><span class="num" style="font-size: 11px; color: var(--sec);"> °C</span>
+        <div class="num" style="font-size: 10px; color: var(--mut);" id="vMaxTN">probe —</div>
+      </div>
+      <div>
+        <div class="lbl tile-lbl">Min</div>
+        <span class="num" style="font-size: 21px; font-weight: 600;" id="vMinT">—</span><span class="num" style="font-size: 11px; color: var(--sec);"> °C</span>
+        <div class="num" style="font-size: 10px; color: var(--mut);" id="vMinTN">probe —</div>
+      </div>
+      <div>
+        <div class="lbl tile-lbl">Average</div>
+        <span class="num" style="font-size: 21px; font-weight: 600;" id="vAvgT">—</span><span class="num" style="font-size: 11px; color: var(--sec);"> °C</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="padding: 10px 14px; display: flex; justify-content: space-between; align-items: center;">
+    <div><div class="lbl" style="font-size: 9.5px; color: var(--mut);">Session out</div><span class="num" style="font-size: 14px; font-weight: 600;" id="vEOut">—</span><span class="num" style="font-size: 10px; color: var(--sec);"> kWh</span></div>
+    <div><div class="lbl" style="font-size: 9.5px; color: var(--mut);">In</div><span class="num" style="font-size: 14px; font-weight: 600;" id="vEIn">—</span><span class="num" style="font-size: 10px; color: var(--sec);"> kWh</span></div>
+    <div><div class="lbl" style="font-size: 9.5px; color: var(--mut);">Efficiency</div><span class="num" style="font-size: 14px; font-weight: 600;" id="vWhKm">—</span><span class="num" style="font-size: 10px; color: var(--sec);"> Wh/km</span></div>
+    <div style="text-align: right;"><div class="lbl" style="font-size: 9.5px; color: var(--mut);">Trip</div><span class="num" style="font-size: 14px; font-weight: 600;" id="vTrip">—</span><span class="num" style="font-size: 10px; color: var(--sec);"> km</span></div>
+  </div>
+
+  <div style="margin-top: auto; display: flex; justify-content: space-between; align-items: center; padding: 2px;">
+    <span class="num" style="font-size: 10px; color: var(--mut);" id="pollStats">—</span>
+    <button class="ghost" style="min-height: 30px; padding: 4px 10px; font-size: 11px;" id="btnTools">Tools</button>
+  </div>
+</div>
+
+<!-- ================= NIGHT VIEW ================= -->
+<div id="viewNight" class="hidden">
+  <div id="nightWrap">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span class="dot" id="recDot" style="background: var(--warn); box-shadow: 0 0 8px var(--warn);"></span>
+        <span class="lbl" style="font-size: 12px; font-weight: 600; color: #8a97ab;" id="recTxt">Recorder armed · starts at 95%</span>
+      </div>
+      <span class="lbl" style="font-size: 11px; font-weight: 600; color: #55627a;" id="wakeTxt">wake lock —</span>
+    </div>
+
+    <div style="text-align: center; padding: 22px 0 4px;">
+      <div style="display: flex; align-items: baseline; justify-content: center; gap: 6px;">
+        <span class="num" style="font-size: 88px; font-weight: 600; line-height: 1; color: #dfe7f3;" id="nSoc">—</span>
+        <span class="num" style="font-size: 24px; color: #55627a;">%</span>
+      </div>
+      <div class="num" style="font-size: 13px; color: #55627a; margin-top: 9px;" id="nEta">—</div>
+    </div>
+
+    <div class="grid3" style="text-align: center;">
+      <div><div class="num" style="font-size: 23px; font-weight: 600; color: #b7c3d6;" id="nPower">—</div><div class="lbl" style="font-size: 10px; color: #55627a;" id="nPowerSub">kW</div></div>
+      <div><div class="num" style="font-size: 23px; font-weight: 600; color: #b7c3d6;" id="nCurr">—</div><div class="lbl" style="font-size: 10px; color: #55627a;">Amps</div></div>
+      <div><div class="num" style="font-size: 23px; font-weight: 600; color: #b7c3d6;" id="nPackV">—</div><div class="lbl" style="font-size: 10px; color: #55627a;">Pack V</div></div>
+    </div>
+
+    <div style="border-top: 1px solid #161b24; border-bottom: 1px solid #161b24; padding: 13px 2px; display: flex; flex-direction: column; gap: 11px; margin-top: 6px;">
+      <div class="rowline" style="font-size: 12px;"><span class="lbl" style="font-size: 11px; color: #55627a;">ΔV now</span>
+        <span><span class="num" style="font-size: 21px; font-weight: 600; color: var(--good);" id="nDelta">—</span> <span class="num" style="font-size: 11px; color: #55627a;">mV</span></span></div>
+      <div class="rowline"><span class="lbl" style="font-size: 11px; color: #55627a;">ΔV peak (95–100% window)</span><span class="num" id="nPeak" style="color: #55627a;">— below 95%</span></div>
+      <div class="rowline"><span class="lbl" style="font-size: 11px; color: #55627a;">Cells max / min</span><span class="num" id="nCells" style="color: #b7c3d6;">—</span></div>
+      <div class="rowline"><span class="lbl" style="font-size: 11px; color: #55627a;">Temp max / min</span><span class="num" id="nTemps" style="color: #b7c3d6;">—</span></div>
+    </div>
+
+    <div style="margin-top: auto; display: flex; flex-direction: column; gap: 10px;">
+      <div style="text-align: center;"><span class="num" style="font-size: 10.5px; color: #3a4356;" id="nFoot">tap to brighten</span></div>
+      <button class="ghost" id="btnDay" style="border-color: #2a3346; color: #8a97ab;">Day view · recording continues</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= REPORT SHEET ================= -->
+<div class="overlay hidden" id="ovReport">
+  <div class="sheet" id="reportSheet"></div>
+</div>
+
+<!-- ================= TOOLS SHEET ================= -->
+<div class="overlay hidden" id="ovTools">
+  <div class="sheet">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <div class="lbl" style="font-size: 15px; font-weight: 700;">Tools</div>
+      <button class="ghost" style="min-height: 34px; padding: 6px 12px;" id="btnToolsClose">Close</button>
+    </div>
+    <div style="display: flex; gap: 8px;">
+      <input id="termIn" placeholder="ATI or 223402…" style="flex: 1; text-transform: uppercase;">
+      <button id="btnSend" style="min-height: 44px;">Send</button>
+    </div>
+    <div id="log"></div>
+    <div class="lbl tile-lbl" style="font-size: 11px;">DID scanner (hunt for per-cell arrays)</div>
+    <div style="display: flex; gap: 8px; align-items: center;">
+      <input id="scanFrom" value="3400" style="width: 80px;">
+      <span style="color: var(--mut);">→</span>
+      <input id="scanTo" value="34FF" style="width: 80px;">
+      <button id="btnScan" style="flex: 1;">Scan</button>
+    </div>
+    <div style="max-height: 200px; overflow-y: auto;">
+      <table id="scanTbl"><thead><tr><th>DID</th><th>len</th><th>payload</th><th>note</th></tr></thead><tbody></tbody></table>
+    </div>
+    <button class="ghost" id="btnReadAll">Read full TDS parameter list once</button>
+    <div style="max-height: 240px; overflow-y: auto;">
+      <table id="allTbl"><tbody></tbody></table>
+    </div>
+    <button class="ghost" id="btnDisconnect" style="border-color: #5a2727; color: var(--crit);">Disconnect adapter</button>
+  </div>
+</div>
+
+<!-- ================= REPORTS LIST ================= -->
+<div class="overlay hidden" id="ovReports">
+  <div class="sheet">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <div class="lbl" style="font-size: 15px; font-weight: 700;">Charge reports</div>
+      <button class="ghost" style="min-height: 34px; padding: 6px 12px;" id="btnReportsClose">Close</button>
+    </div>
+    <div id="reportsList" style="display: flex; flex-direction: column; gap: 8px;"></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ============================================================
+   evMonitor — EV BMS monitor over Web Bluetooth (BLE ELM327)
+   DID maps extracted from Tata TDS dealer databases (see /reference)
+   ============================================================ */
+
+/* ---------- DID families: value = raw * f + o (canonical units) ---------- */
+const FAMILIES = {
+  // Tata Gen2/KPD family (Punch, Nexon, Tiago, Tigor, Curvv, Harrier) — BMS 785/78D
+  tata34: {
+    soc:   { did: "3402", bytes: 2, f: 0.1,   o: 0 },
+    soh:   { did: "3403", bytes: 2, f: 0.1,   o: 0 },
+    packV: { did: "3400", bytes: 2, f: 0.1,   o: 0, sanity500: true },
+    packI: { did: "3401", bytes: 2, f: 0.1,   o: -320 },
+    maxV:  { did: "3415", bytes: 2, f: 1,     o: 0 },   // mV
+    minV:  { did: "3417", bytes: 2, f: 1,     o: 0 },
+    maxN:  { did: "3419", bytes: 1, f: 1,     o: 0 },
+    minN:  { did: "341A", bytes: 1, f: 1,     o: 0 },
+    delta: { did: "34D5", bytes: 2, f: 1,     o: 0 },
+    maxT:  { did: "3409", bytes: 1, f: 1,     o: -40 },
+    minT:  { did: "340B", bytes: 1, f: 1,     o: -40 },
+    maxTN: { did: "340A", bytes: 1, f: 1,     o: 0 },
+    minTN: { did: "340C", bytes: 1, f: 1,     o: 0 },
+    avgT:  { did: "3412", bytes: 1, f: 1,     o: -40 },
+    bal:   { did: "3479", bytes: 1, f: 1,     o: 0 },
+    lv:    { did: "3492", bytes: 2, f: 0.001, o: 0 },
+  },
+  // Tata TacoGotion $30xx family (alt for some packs)
+  tata30: {
+    soc:   { did: "300F", bytes: 2, f: 0.1, o: 0 },
+    soh:   { did: "3010", bytes: 1, f: 1,   o: 0 },
+    packV: { did: "300D", bytes: 2, f: 0.1, o: 0 },
+    packI: { did: "300E", bytes: 2, f: 0.1, o: -60 },
+    maxV:  { did: "3017", bytes: 2, f: 10,  o: 0 },
+    minV:  { did: "3018", bytes: 2, f: 10,  o: 0 },
+    maxN:  { did: "3019", bytes: 1, f: 1,   o: 0 },
+    minN:  { did: "301A", bytes: 1, f: 1,   o: 0 },
+    delta: { did: "305B", bytes: 2, f: 10,  o: 0 },
+    maxT:  { did: "3011", bytes: 1, f: 1,   o: -50 },
+    minT:  { did: "3012", bytes: 1, f: 1,   o: -50 },
+    maxTN: { did: "303C", bytes: 1, f: 1,   o: 0 },
+    minTN: { did: "303D", bytes: 1, f: 1,   o: 0 },
+    avgT:  { did: "3054", bytes: 1, f: 1,   o: -50 },
+    bal:   { did: "3051", bytes: 1, f: 1,   o: 0 },
+  },
+  // MG / SAIC
+  mg: {
+    soc:   { did: "B046", bytes: 2, f: 0.1,   o: 0 },
+    soh:   { did: "B061", bytes: 2, f: 0.01,  o: 0 },
+    packV: { did: "B042", bytes: 2, f: 0.25,  o: 0 },
+    packI: { did: "B043", bytes: 2, f: 0.025, o: -1000 },
+    maxV:  { did: "B058", bytes: 2, f: 1,     o: 0 },
+    minV:  { did: "B059", bytes: 2, f: 1,     o: 0 },
+    maxN:  { did: "B062", bytes: 1, f: 1,     o: 0 },
+    minN:  { did: "B063", bytes: 1, f: 1,     o: 0 },
+    delta: { did: "B05A", bytes: 2, f: 1,     o: 0 },
+    avgT:  { did: "B056", bytes: 1, f: 0.5,   o: -40 },
+  },
+  // BYD Blade — little-endian
+  byd: {
+    soc:   { did: "0005", bytes: 1, f: 1,   o: 0 },
+    soh:   { did: "0012", bytes: 1, f: 1,   o: 0 },
+    packV: { did: "0008", bytes: 2, f: 0.1, o: 0,    le: true },
+    packI: { did: "0009", bytes: 2, f: 0.1, o: -500, le: true },
+    maxV:  { did: "0015", bytes: 2, f: 1,   o: 0,    le: true },
+    minV:  { did: "0016", bytes: 2, f: 1,   o: 0,    le: true },
+    delta: { did: "0017", bytes: 2, f: 1,   o: 0,    le: true },
+    avgT:  { did: "0020", bytes: 1, f: 1,   o: -40 },
+  },
+};
+const FAST_KEYS = ["soc", "packV", "packI", "maxV", "minV", "maxN", "minN", "delta"];
+const SLOW_KEYS = ["soh", "maxT", "minT", "avgT", "maxTN", "minTN", "bal", "lv"];
+
+/* ---------- vehicle profiles ---------- */
+const PROFILES = [
+  { id: "tata_punch_ev_lr",  name: "Punch EV Long Range",  make: "Tata", kwh: 35.0, cells: 102, chem: "LFP 102S7P",  hdr: "785", rx: "78D", fam: "tata34" },
+  { id: "tata_punch_ev_mr",  name: "Punch EV Medium Range",make: "Tata", kwh: 25.0, cells: 102, chem: "LFP 102S5P",  hdr: "785", rx: "78D", fam: "tata34" },
+  { id: "tata_punch_ev_40",  name: "Punch EV 40 kWh",      make: "Tata", kwh: 40.4, cells: 105, chem: "LFP prismatic", hdr: "785", rx: "78D", fam: "tata34" },
+  { id: "tata_nexon_ev_45",  name: "Nexon EV 45",          make: "Tata", kwh: 45.0, cells: 96,  chem: "LFP 96S1P",   hdr: "785", rx: "78D", fam: "tata34" },
+  { id: "tata_nexon_ev_max", name: "Nexon EV Max / LR",    make: "Tata", kwh: 40.5, cells: 104, chem: "LFP 104S8P",  hdr: "785", rx: "78D", fam: "tata34" },
+  { id: "tata_nexon_ev_prime", name: "Nexon EV Prime",     make: "Tata", kwh: 30.2, cells: 100, chem: "LFP 100S6P",  hdr: "785", rx: "78D", fam: "tata34" },
+  { id: "tata_tiago_ev",     name: "Tiago / Tigor EV LR",  make: "Tata", kwh: 24.0, cells: 100, chem: "LFP 100S5P",  hdr: "785", rx: "78D", fam: "tata34" },
+  { id: "tata_tiago_ev_mr",  name: "Tiago EV MR",          make: "Tata", kwh: 19.2, cells: 100, chem: "LFP 100S4P",  hdr: "785", rx: "78D", fam: "tata34" },
+  { id: "tata_curvv_ev_55",  name: "Curvv.ev 55",          make: "Tata", kwh: 55.0, cells: 108, chem: "LFP 108S1P",  hdr: "785", rx: "78D", fam: "tata34" },
+  { id: "tata_harrier_ev",   name: "Harrier / Sierra.ev",  make: "Tata", kwh: 75.0, cells: 118, chem: "LFP 118S1P",  hdr: "785", rx: "78D", fam: "tata34" },
+  { id: "mg_zs_ev",          name: "MG ZS EV (experimental)",    make: "MG",  kwh: 50.3, cells: 96, chem: "LFP 96S", hdr: "745", rx: "74D", fam: "mg" },
+  { id: "mg_comet_ev",       name: "MG Comet (experimental)",    make: "MG",  kwh: 17.3, cells: 48, chem: "LFP 48S", hdr: "745", rx: "74D", fam: "mg" },
+  { id: "byd_atto_3",        name: "BYD Atto 3 (experimental)",  make: "BYD", kwh: 60.5, cells: 126, chem: "LFP Blade", hdr: "781", rx: "789", fam: "byd" },
+];
+const VIN_TABLE = [
+  [/^MAT832/, "tata_punch_ev_mr"], [/^MAT83[35]/, "tata_punch_ev_lr"], [/^MAT834/, "tata_punch_ev_40"],
+  [/^MAT62[01]/, "tata_nexon_ev_prime"], [/^MAT62[23]/, "tata_nexon_ev_max"],
+  [/^MAT624/, "tata_tiago_ev_mr"], [/^MAT625/, "tata_tiago_ev"],
+  [/^MAT63/, "tata_nexon_ev_45"], [/^MAT636/, "tata_curvv_ev_55"], [/^MAT61/, "tata_harrier_ev"],
+  [/^LGX/, "byd_atto_3"], [/^(MZ7|LSJ|MAJ|MEX)/, "mg_zs_ev"],
+];
+
+/* ---------- full TDS list for the Tools one-shot read ---------- */
+const TDS_FULL = [
+  ["3400","Pack voltage",2,0.1,0,"V"],["3401","Pack current",2,0.1,-320,"A"],["3402","SOC",2,0.1,0,"%"],
+  ["3403","SOH",2,0.1,0,"%"],["3409","Max cell temp",1,1,-40,"°C"],["340A","Max temp probe #",1,1,0,""],
+  ["340B","Min cell temp",1,1,-40,"°C"],["340C","Min temp probe #",1,1,0,""],["3410","Coolant inlet",1,1,-40,"°C"],
+  ["3411","Coolant outlet",1,1,-40,"°C"],["3412","Avg temp",1,1,-40,"°C"],["3415","Max cell",2,1,0,"mV"],
+  ["3417","Min cell",2,1,0,"mV"],["3419","Max cell #",1,1,0,""],["341A","Min cell #",1,1,0,""],
+  ["341B","Temp probes",1,1,0,""],["3479","Balance status",1,1,0,""],["347B","Chg current limit",2,0.1,0,"A"],
+  ["347C","Dischg current limit",2,0.1,0,"A"],["3481","Neg busbar",2,0.1,0,"V"],["3482","Pos busbar",2,0.1,0,"V"],
+  ["3492","12V supply",2,0.001,0,"V"],["34D5","Cell ΔV",2,1,0,"mV"],
+];
+
+/* ============================ BLE transport ============================ */
+const BLE_UUIDS = [
+  { s: 0xFFF0, w: 0xFFF2, n: 0xFFF1 }, { s: 0xFFE0, w: 0xFFE1, n: 0xFFE1 },
+  { s: 0x18F0, w: 0x2AF1, n: 0x2AF0 },
+  { s: "6e400001-b5a3-f393-e0a9-e50e24dcca9e", w: "6e400002-b5a3-f393-e0a9-e50e24dcca9e", n: "6e400003-b5a3-f393-e0a9-e50e24dcca9e" },
+  { s: "e7810a71-73ae-499d-8c15-faa9aef0c3f2", w: "bef8d6c9-9c21-4c9e-b632-bd58c1009f9f", n: "bef8d6c9-9c21-4c9e-b632-bd58c1009f9f" },
+];
+
+class Elm {
+  constructor() { this.dev = null; this.wr = null; this.buf = ""; this.waiter = null; this.q = Promise.resolve(); this.connected = false; this.onDisconnect = null; }
+
+  async pick() {
+    const dev = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: BLE_UUIDS.map(c => c.s) });
+    await this.attach(dev);
+  }
+
+  async reconnectSilent() {
+    if (!navigator.bluetooth.getDevices) return false;
+    const savedId = localStorage.getItem("evm_device");
+    if (!savedId) return false;
+    const devs = await navigator.bluetooth.getDevices();
+    const dev = devs.find(d => d.id === savedId);
+    if (!dev) return false;
+    try { await this.attach(dev); return true; } catch (e) { return false; }
+  }
+
+  async attach(dev) {
+    const gatt = await dev.gatt.connect();
+    dev.addEventListener("gattserverdisconnected", () => { this.connected = false; if (this.onDisconnect) this.onDisconnect(); });
+    let pair = null;
+    for (const c of BLE_UUIDS) {
+      try {
+        const svc = await gatt.getPrimaryService(c.s);
+        pair = { wr: await svc.getCharacteristic(c.w), nt: await svc.getCharacteristic(c.n) };
+        break;
+      } catch (e) {}
+    }
+    if (!pair) {
+      for (const svc of await gatt.getPrimaryServices()) {
+        const chars = await svc.getCharacteristics();
+        const nt = chars.find(ch => ch.properties.notify || ch.properties.indicate);
+        const wr = chars.find(ch => ch.properties.write || ch.properties.writeWithoutResponse);
+        if (nt && wr) { pair = { wr, nt }; break; }
+      }
+    }
+    if (!pair) throw new Error("No ELM327 BLE service found — classic-Bluetooth-only adapters do not work with Web Bluetooth");
+    await pair.nt.startNotifications();
+    pair.nt.addEventListener("characteristicvaluechanged", ev => {
+      this.buf += new TextDecoder().decode(ev.target.value);
+      if (this.buf.includes(">") && this.waiter) {
+        const w = this.waiter; this.waiter = null; clearTimeout(w.t);
+        const r = this.buf; this.buf = ""; w.res(r);
+      }
+    });
+    this.dev = dev; this.wr = pair.wr; this.connected = true;
+    localStorage.setItem("evm_device", dev.id);
+  }
+
+  send(cmd, timeout = 2200) {
+    const run = () => new Promise(res => {
+      if (!this.connected) return res("");
+      this.buf = "";
+      const t = setTimeout(() => { if (this.waiter) { this.waiter = null; const r = this.buf; this.buf = ""; res(r); } }, timeout);
+      this.waiter = { res, t };
+      logLine("> " + cmd, "tx");
+      const data = new TextEncoder().encode(cmd + "\r");
+      const p = this.wr.properties.writeWithoutResponse ? this.wr.writeValueWithoutResponse(data) : this.wr.writeValue(data);
+      p.catch(() => { clearTimeout(t); this.waiter = null; res(""); });
+    }).then(r => { const c = r.replace(/[\r\n>]+/g, " ").trim(); if (c) logLine("< " + c); return r; });
+    this.q = this.q.then(run, run);
+    return this.q;
+  }
+
+  disconnect() { try { this.dev && this.dev.gatt.disconnect(); } catch (e) {} }
+}
+
+/* ============================ UDS helpers ============================ */
+function flatHex(resp) {
+  let t = (resp || "").toUpperCase().replace(/SEARCHING\.\.\./g, "");
+  t = t.replace(/\b[0-9A-F]{1,2}:\s?/g, "");        // multiframe index prefixes "0:" "1:"
+  return t.replace(/[^0-9A-F]/g, "");
+}
+function udsPayload(resp, sid, id) {
+  const flat = flatHex(resp);
+  if (!flat) return null;
+  const m = sid + id.toUpperCase();
+  const i = flat.indexOf(m);
+  if (i < 0) return null;
+  const hex = flat.substring(i + m.length);
+  const bytes = [];
+  for (let j = 0; j + 1 < hex.length; j += 2) bytes.push(parseInt(hex.substr(j, 2), 16));
+  return bytes;
+}
+function decodeEntry(e, bytes) {
+  if (!bytes || bytes.length < e.bytes) return null;
+  let raw = 0;
+  if (e.le) { for (let i = e.bytes - 1; i >= 0; i--) raw = (raw << 8) | bytes[i]; }
+  else      { for (let i = 0; i < e.bytes; i++)      raw = (raw << 8) | bytes[i]; }
+  let v = raw * e.f + e.o;
+  if (e.sanity500 && v > 500) v = raw * 0.01;   // scaling ambiguity guard for pack voltage
+  return v;
+}
+
+/* ============================ App state ============================ */
+const elm = new Elm();
+const S = {
+  profile: null, view: "connect", night: false, polling: false, scanning: false,
+  t: {},                                   // live telemetry
+  reads: 0, misses: 0,
+  session: { start: 0, eOut: 0, eIn: 0, lastT: 0, lastP: 0, odoStart: null, odoNow: null },
+  charging: false, chargeStreak: 0, idleStreak: 0,
+  rec: null,                               // active recording window
+  socHist: [],                             // [t, soc] for ETA
+  wakeLock: null, dimTimer: null,
+  lastOdoAt: 0,
+};
+const $ = id => document.getElementById(id);
+function logLine(msg, cls) {
+  const el = $("log"); if (!el) return;
+  const d = document.createElement("div"); if (cls) d.className = cls; d.textContent = msg;
+  el.appendChild(d); while (el.childNodes.length > 250) el.removeChild(el.firstChild);
+  el.scrollTop = el.scrollHeight;
+}
+
+/* ============================ Connect + detect ============================ */
+function step(id, state, text) {
+  const el = $(id); el.className = "step " + state;
+  if (text) el.querySelector("span:last-child").textContent = text;
+}
+
+async function connectFlow(silent) {
+  try {
+    if (!navigator.bluetooth) throw new Error("No Web Bluetooth in this browser. Use Chrome or Edge on Android.");
+    step("stAdapter", "on");
+    if (silent) {
+      if (!await elm.reconnectSilent()) return false;
+    } else {
+      await elm.pick();
+    }
+    elm.onDisconnect = onAdapterLost;
+    step("stAdapter", "ok", "Adapter linked · " + (elm.dev.name || "BLE OBD"));
+
+    step("stElm", "on");
+    await elm.send("ATZ", 4000);
+    for (const c of ["ATE0", "ATL0", "ATS0", "ATH0", "ATCAF1", "ATSP6", "ATST64"]) await elm.send(c, 800);
+    step("stElm", "ok", "CAN 500k · ELM ready");
+
+    /* detect */
+    let vin = null, profId = localStorage.getItem("evm_profile");
+    step("stVin", "on");
+    const r09 = await elm.send("0902", 2500);
+    vin = vinFrom(udsPayload(r09, "49", "02"));
+    if (!vin) {
+      for (const [h, rx] of [["7E3", "7EB"], ["785", "78D"], ["744", "74C"], ["781", "789"], ["7E4", "7EC"]]) {
+        await elm.send("ATSH" + h, 600); await elm.send("ATCRA" + rx, 600);
+        await elm.send("1003", 900);
+        vin = vinFrom(udsPayload(await elm.send("22F190", 1200), "62", "F190"));
+        if (vin) break;
+      }
+    }
+    if (vin) {
+      step("stVin", "ok", "VIN · " + vin.slice(0, 6) + "•••" + vin.slice(-4));
+      for (const [re, id] of VIN_TABLE) if (re.test(vin)) { profId = id; break; }
+    } else step("stVin", "fail", "VIN unreadable — using fingerprint");
+
+    /* BMS handshake with the (candidate) profile */
+    let prof = PROFILES.find(p => p.id === profId) || null;
+    step("stBms", "on");
+    if (!prof) {
+      // fingerprint: Tata?
+      await elm.send("ATSH785", 600); await elm.send("ATCRA78D", 600); await elm.send("1003", 900);
+      if (flatHex(await elm.send("223402", 1200)).includes("6234")) prof = PROFILES[0];
+    }
+    if (!prof) prof = PROFILES.find(p => p.id === $("selProfile").value) || PROFILES[0];
+    await elm.send("ATSH" + prof.hdr, 600); await elm.send("ATCRA" + prof.rx, 600);
+    const sess = flatHex(await elm.send("1003", 1500));
+    const alive = flatHex(await elm.send("22" + FAMILIES[prof.fam].soc.did, 1500)).includes("62");
+    step("stBms", alive ? "ok" : "fail", alive ? `BMS on ${prof.hdr}/${prof.rx} · responding` : `BMS on ${prof.hdr} — no answer (ignition on?)`);
+
+    setProfile(prof, vin ? "matched from VIN prefix " + vin.slice(0, 6) : "CAN fingerprint / manual");
+    $("btnStart").classList.remove("hidden");
+    $("btnConnect").textContent = "Re-detect";
+    if (silent && alive) startMonitoring();
+    return true;
+  } catch (e) {
+    logLine("connect: " + e.message, "err");
+    $("compatWarn").style.display = "block";
+    $("compatWarn").textContent = e.message;
+    return false;
+  }
+}
+function vinFrom(bytes) {
+  if (!bytes) return null;
+  const ascii = bytes.map(b => (b >= 0x30 && b <= 0x5A) ? String.fromCharCode(b) : "").join("");
+  const m = ascii.match(/[A-HJ-NPR-Z0-9]{17}/);
+  return m ? m[0] : null;
+}
+function setProfile(prof, how) {
+  S.profile = prof;
+  localStorage.setItem("evm_profile", prof.id);
+  $("selProfile").value = prof.id;
+  $("detCard").classList.remove("hidden");
+  $("detName").textContent = prof.name;
+  $("detSpec").textContent = `${prof.kwh} kWh · ${prof.chem}`;
+  $("detHow").textContent = how;
+  $("dashCar").textContent = prof.name.split(" (")[0];
+  $("dashSub").textContent = `BMS Live · ${prof.hdr}/${prof.rx}`;
+  $("vPackSpec").textContent = `${prof.kwh} kWh · ${prof.cells}S ${prof.chem.split(" ")[0]}`;
+}
+function onAdapterLost() {
+  S.polling = false;
+  $("connDot").classList.remove("on"); $("connTxt").textContent = "Lost";
+  logLine("adapter disconnected", "err");
+}
+
+/* ============================ Polling ============================ */
+async function readKey(key) {
+  const e = FAMILIES[S.profile.fam][key];
+  if (!e) return null;
+  const bytes = udsPayload(await elm.send("22" + e.did, 1500), "62", e.did);
+  if (!bytes) { S.misses++; return null; }
+  S.reads++;
+  const v = decodeEntry(e, bytes);
+  if (v !== null) S.t[key] = v;
+  return v;
+}
+
+let slowIdx = 0;
+async function pollLoop() {
+  S.polling = true;
+  S.session.start = S.session.start || Date.now();
+  let lastTP = 0;
+  while (S.polling && elm.connected) {
+    for (const k of FAST_KEYS) { if (!S.polling) break; await readKey(k); }
+    await readKey(SLOW_KEYS[slowIdx++ % SLOW_KEYS.length]);
+    if (Date.now() - lastTP > 2500) { await elm.send("3E80", 800); lastTP = Date.now(); }
+    tick();
+    render();
+    // odometer every 60 s in day view
+    if (!S.night && Date.now() - S.lastOdoAt > 60000) { S.lastOdoAt = Date.now(); await readOdo(); }
+    const wait = S.night && !(S.rec) && (S.t.soc || 0) < 95 ? 1500 : 0;
+    if (wait) await new Promise(r => setTimeout(r, wait));
+  }
+}
+
+async function readOdo() {
+  if (!S.profile || S.profile.make !== "Tata") return;
+  try {
+    await elm.send("ATSH7E3", 500); await elm.send("ATCRA7EB", 500); await elm.send("1003", 800);
+    const bytes = udsPayload(await elm.send("22A001", 1200), "62", "A001");
+    await elm.send("ATSH" + S.profile.hdr, 500); await elm.send("ATCRA" + S.profile.rx, 500); await elm.send("1003", 800);
+    if (bytes && bytes.length >= 3) {
+      const km = (bytes[0] << 16) | (bytes[1] << 8) | bytes[2];
+      if (km > 0 && km < 1500000) {
+        S.session.odoNow = km;
+        if (S.session.odoStart === null) S.session.odoStart = km;
+      }
+    }
+  } catch (e) {}
+}
+
+/* ---------- per-sample bookkeeping ---------- */
+function tick() {
+  const now = Date.now(), t = S.t;
+  /* energy integration */
+  if (t.packV != null && t.packI != null) {
+    const p = t.packV * t.packI / 1000;     // kW, + discharge / − charge
+    if (S.session.lastT) {
+      const dtH = (now - S.session.lastT) / 3600000;
+      const avg = (p + S.session.lastP) / 2;
+      if (avg > 0) S.session.eOut += avg * dtH; else S.session.eIn += -avg * dtH;
+    }
+    S.session.lastT = now; S.session.lastP = p;
+  }
+  /* charging state machine */
+  if (t.packI != null) {
+    if (t.packI < -0.5) { S.chargeStreak++; S.idleStreak = 0; } else { S.idleStreak++; S.chargeStreak = 0; }
+    if (!S.charging && S.chargeStreak >= 3) { S.charging = true; if (!S.night) enterNight(); }
+    if (S.charging && S.idleStreak >= 25) { S.charging = false; finalizeRec(); }
+  }
+  /* ETA history */
+  if (t.soc != null) {
+    S.socHist.push([now, t.soc]);
+    while (S.socHist.length && now - S.socHist[0][0] > 300000) S.socHist.shift();
+  }
+  /* recorder: 95 → 100 % while charging */
+  if (S.charging && t.soc != null && t.soc >= 95) {
+    if (!S.rec) {
+      S.rec = { start: now, socStart: t.soc, samples: [], peak: null, top: null,
+                ext: {}, eInAtStart: S.session.eIn };
+      logLine("recorder started at " + t.soc.toFixed(1) + "%", "ok");
+    }
+    const s = { t: now, soc: t.soc, packV: t.packV, packI: t.packI, maxV: t.maxV, minV: t.minV,
+                maxN: t.maxN, minN: t.minN, delta: liveDelta(), maxT: t.maxT, minT: t.minT };
+    S.rec.samples.push(s);
+    for (const k of ["packV", "maxV", "minV", "delta", "maxT", "minT"]) {
+      if (s[k] == null) continue;
+      const e = S.rec.ext[k] || (S.rec.ext[k] = { lo: s[k], hi: s[k] });
+      if (s[k] < e.lo) e.lo = s[k];
+      if (s[k] > e.hi) e.hi = s[k];
+    }
+    if (!S.rec.peak || (s.delta != null && s.delta > S.rec.peak.delta)) S.rec.peak = s;
+    if (!S.rec.top || s.soc >= S.rec.top.soc) S.rec.top = s;
+  }
+}
+function liveDelta() {
+  const t = S.t;
+  if (t.delta != null && t.delta > 0) return t.delta;
+  if (t.maxV != null && t.minV != null) return t.maxV - t.minV;
+  return null;
+}
+
+function finalizeRec() {
+  if (!S.rec || !S.rec.samples.length) { S.rec = null; return; }
+  const r = S.rec; S.rec = null;
+  /* downsample to ≤ 600 points */
+  const ds = []; const stepN = Math.max(1, Math.floor(r.samples.length / 600));
+  for (let i = 0; i < r.samples.length; i += stepN) ds.push(r.samples[i]);
+  if (ds[ds.length - 1] !== r.samples[r.samples.length - 1]) ds.push(r.samples[r.samples.length - 1]);
+  const report = {
+    id: Date.now(), start: r.start, end: r.samples[r.samples.length - 1].t,
+    socStart: r.socStart, socEnd: r.top ? r.top.soc : null,
+    top: r.top, peak: r.peak, ext: r.ext,
+    eIn: +(S.session.eIn - r.eInAtStart + 0).toFixed(2),
+    eInFull: +S.session.eIn.toFixed(2),
+    samples: ds,
+  };
+  const all = getReports(); all.unshift(report);
+  while (all.length > 20) all.pop();
+  localStorage.setItem("evm_reports", JSON.stringify(all));
+  logLine("charge report saved — top ΔV " + (report.top && report.top.delta != null ? report.top.delta : "?") + " mV", "ok");
+  showReport(report);
+}
+function getReports() { try { return JSON.parse(localStorage.getItem("evm_reports")) || []; } catch (e) { return []; } }
+
+/* ============================ Rendering ============================ */
+function fmt(v, dp) { return v == null || isNaN(v) ? "—" : v.toFixed(dp); }
+function render() {
+  const t = S.t, d = liveDelta();
+  if (S.night) {
+    $("nSoc").textContent = fmt(t.soc, 1);
+    const p = (t.packV != null && t.packI != null) ? t.packV * t.packI / 1000 : null;
+    $("nPower").textContent = p == null ? "—" : Math.abs(p).toFixed(1);
+    $("nPowerSub").textContent = p == null ? "kW" : (p < -0.05 ? "kW in" : "kW out");
+    $("nCurr").textContent = t.packI == null ? "—" : Math.abs(t.packI).toFixed(1);
+    $("nPackV").textContent = fmt(t.packV, 1);
+    $("nDelta").textContent = d == null ? "—" : Math.round(d);
+    $("nCells").textContent = (t.maxV != null && t.minV != null)
+      ? `${(t.maxV / 1000).toFixed(3)} #${t.maxN ?? "?"} · ${(t.minV / 1000).toFixed(3)} #${t.minN ?? "?"}` : "—";
+    $("nTemps").textContent = (t.maxT != null || t.minT != null) ? `${fmt(t.maxT, 0)} / ${fmt(t.minT, 0)} °C` : "—";
+    $("nEta").textContent = etaText();
+    /* recorder status */
+    if (S.rec) {
+      $("recDot").style.background = "var(--crit)"; $("recDot").style.boxShadow = "0 0 8px var(--crit)";
+      $("recTxt").textContent = `Recording · ${S.rec.samples.length} samples`;
+      $("nPeak").textContent = S.rec.peak && S.rec.peak.delta != null ? `${Math.round(S.rec.peak.delta)} mV @ ${S.rec.peak.soc.toFixed(0)}%` : "—";
+      $("nPeak").style.color = "#b7c3d6";
+    } else {
+      $("recDot").style.background = "var(--warn)"; $("recDot").style.boxShadow = "0 0 8px var(--warn)";
+      $("recTxt").textContent = S.charging ? "Recorder armed · starts at 95%" : "Not charging";
+      $("nPeak").textContent = "— below 95%"; $("nPeak").style.color = "#55627a";
+    }
+    $("nFoot").textContent = (S.charging ? "charging · " : "") + "recorder window 95–100% · tap to brighten";
+    return;
+  }
+  $("vSoc").textContent = fmt(t.soc, 1);
+  $("vSoh").textContent = fmt(t.soh, 1);
+  $("socBar").style.width = (t.soc || 0) + "%";
+  $("vKwhLeft").textContent = t.soc != null && S.profile ? `≈ ${(S.profile.kwh * t.soc / 100).toFixed(1)} kWh` : "—";
+  const p = (t.packV != null && t.packI != null) ? t.packV * t.packI / 1000 : null;
+  $("vPower").textContent = p == null ? "—" : Math.abs(p).toFixed(2);
+  $("vPowerSub").textContent = p == null ? "kW" : (p < -0.05 ? "kW · charging" : "kW · drive");
+  $("vCurr").textContent = t.packI == null ? "—" : Math.abs(t.packI).toFixed(1);
+  $("vCurrSub").textContent = t.packI == null ? "A" : (t.packI < -0.05 ? "A · charge" : "A · discharge");
+  $("vPackV").textContent = fmt(t.packV, 1);
+  $("vMaxV").textContent = t.maxV == null ? "—" : (t.maxV / 1000).toFixed(3);
+  $("vMinV").textContent = t.minV == null ? "—" : (t.minV / 1000).toFixed(3);
+  $("vMaxN").textContent = "cell #" + (t.maxN ?? "—");
+  $("vMinN").textContent = "cell #" + (t.minN ?? "—");
+  $("vDelta").textContent = d == null ? "—" : Math.round(d);
+  $("vDelta").style.color = d == null ? "var(--sec)" : d > 100 ? "var(--crit)" : d > 40 ? "var(--warn)" : "var(--good)";
+  $("deltaBar").style.width = Math.min(100, (d || 0)) + "%";
+  $("deltaBar").style.background = $("vDelta").style.color;
+  $("vBal").textContent = "Balancing: " + (t.bal == null ? "—" : (t.bal ? "active" : "idle"));
+  $("vMaxT").textContent = fmt(t.maxT, 0); $("vMinT").textContent = fmt(t.minT, 0); $("vAvgT").textContent = fmt(t.avgT, 0);
+  $("vMaxTN").textContent = "probe " + (t.maxTN ?? "—"); $("vMinTN").textContent = "probe " + (t.minTN ?? "—");
+  $("vEOut").textContent = S.session.eOut.toFixed(2);
+  $("vEIn").textContent = S.session.eIn.toFixed(2);
+  const trip = S.session.odoNow != null && S.session.odoStart != null ? S.session.odoNow - S.session.odoStart : null;
+  $("vTrip").textContent = trip == null ? "—" : trip.toFixed(0);
+  $("vWhKm").textContent = trip ? ((S.session.eOut - S.session.eIn) * 1000 / trip).toFixed(0) : "—";
+  $("pollStats").textContent = `${S.reads} reads · ${S.misses} misses`;
+  $("connDot").classList.toggle("on", elm.connected);
+  $("connTxt").textContent = elm.connected ? "Connected" : "Lost";
+}
+
+function etaText() {
+  if (S.socHist.length < 10) return S.charging ? "estimating…" : "—";
+  const [t0, s0] = S.socHist[0], [t1, s1] = S.socHist[S.socHist.length - 1];
+  const rate = (s1 - s0) / (t1 - t0);   // % per ms
+  if (rate <= 0) return S.charging ? "estimating…" : "not charging";
+  const msLeft = (100 - s1) / rate;
+  const eta = new Date(Date.now() + msLeft);
+  return "100% ≈ " + eta.toTimeString().slice(0, 5);
+}
+
+/* ============================ Views ============================ */
+function show(view) {
+  S.view = view;
+  $("viewConnect").classList.toggle("hidden", view !== "connect");
+  $("viewDash").classList.toggle("hidden", view !== "dash");
+  $("viewNight").classList.toggle("hidden", view !== "night");
+}
+function startMonitoring() {
+  show("dash");
+  if (!S.polling) pollLoop();
+}
+async function enterNight() {
+  S.night = true; document.body.classList.add("night"); show("night");
+  try {
+    S.wakeLock = await navigator.wakeLock.request("screen");
+    $("wakeTxt").textContent = "wake lock on";
+    S.wakeLock.addEventListener("release", () => { $("wakeTxt").textContent = "wake lock off"; });
+  } catch (e) { $("wakeTxt").textContent = "wake lock unavailable"; }
+  resetDim();
+}
+function exitNight() {
+  S.night = false; document.body.classList.remove("night", "dim"); show("dash");
+  if (S.wakeLock) { S.wakeLock.release().catch(() => {}); S.wakeLock = null; }
+  clearTimeout(S.dimTimer);
+}
+function resetDim() {
+  document.body.classList.remove("dim");
+  clearTimeout(S.dimTimer);
+  S.dimTimer = setTimeout(() => { if (S.night) document.body.classList.add("dim"); }, 30000);
+}
+document.addEventListener("visibilitychange", async () => {
+  if (document.visibilityState === "visible" && S.night && !S.wakeLock) {
+    try { S.wakeLock = await navigator.wakeLock.request("screen"); $("wakeTxt").textContent = "wake lock on"; } catch (e) {}
+  }
+});
+document.addEventListener("pointerdown", () => { if (S.night) resetDim(); });
+
+/* ============================ Report UI ============================ */
+function showReport(r) {
+  const el = $("reportSheet");
+  const dur = (t) => new Date(t).toTimeString().slice(0, 5);
+  const day = (t) => new Date(t).toLocaleDateString(undefined, { weekday: "short" });
+  const cellV = mv => mv == null ? "—" : (mv / 1000).toFixed(3);
+  const ex = r.ext || {};
+  const exRow = (k, unit, f) => ex[k] ? `${f(ex[k].lo)} → ${f(ex[k].hi)} ${unit}` : "—";
+  /* sparkline */
+  let spark = "";
+  if (r.samples && r.samples.length > 2) {
+    const pts = r.samples.filter(s => s.delta != null);
+    if (pts.length > 2) {
+      const dmin = Math.min(...pts.map(s => s.delta)), dmax = Math.max(...pts.map(s => s.delta));
+      const smin = pts[0].soc, smax = pts[pts.length - 1].soc || 100;
+      const X = s => 30 + (s.soc - smin) / Math.max(0.5, smax - smin) * 288;
+      const Y = s => 60 - (s.delta - dmin) / Math.max(1, dmax - dmin) * 48;
+      const poly = pts.map(s => `${X(s).toFixed(1)},${Y(s).toFixed(1)}`).join(" ");
+      const pk = r.peak || pts[0];
+      spark = `<svg width="100%" height="84" viewBox="0 0 326 84">
+        <line x1="30" y1="8" x2="30" y2="64" stroke="#232d40"/><line x1="30" y1="64" x2="318" y2="64" stroke="#232d40"/>
+        <text x="26" y="14" fill="#5c6b84" font-size="9" text-anchor="end">${Math.round(dmax)}</text>
+        <text x="26" y="66" fill="#5c6b84" font-size="9" text-anchor="end">${Math.round(dmin)}</text>
+        <text x="30" y="78" fill="#5c6b84" font-size="9" text-anchor="middle">${smin.toFixed(0)}%</text>
+        <text x="318" y="78" fill="#5c6b84" font-size="9" text-anchor="end">${smax.toFixed(0)}%</text>
+        <polyline points="${poly}" fill="none" stroke="#4d9fff" stroke-width="2" stroke-linejoin="round"/>
+        <circle cx="${X(pk)}" cy="${Y(pk)}" r="3.5" fill="#4d9fff"/>
+        <text x="${X(pk)}" y="${Math.max(9, Y(pk) - 8)}" fill="#93a1b8" font-size="9" text-anchor="middle">peak ${Math.round(pk.delta)} @ ${pk.soc.toFixed(0)}%</text>
+      </svg>`;
+    }
+  }
+  const top = r.top || {};
+  el.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <div class="lbl" style="font-size:16px; font-weight:700;">Charge report</div>
+        <div class="num" style="font-size:11px; color:var(--mut);">${day(r.start)} · recorded ${dur(r.start)} → ${dur(r.end)} · ${fmt(r.socStart,1)} → ${fmt(r.socEnd,1)}%</div>
+      </div>
+      <button class="ghost" style="min-height:34px; padding:6px 12px;" onclick="document.getElementById('ovReport').classList.add('hidden')">Close</button>
+    </div>
+    <div class="card" style="padding:15px; border-color:#35507a; display:flex; flex-direction:column; gap:10px;">
+      <div class="lbl" style="font-size:11px; font-weight:600; color:var(--accent);">Top of charge · ${fmt(top.soc,1)}% @ ${top.t ? dur(top.t) : "—"}</div>
+      <div style="display:flex; align-items:baseline; gap:6px;">
+        <span class="num" style="font-size:40px; font-weight:600; line-height:1;">${top.delta != null ? Math.round(top.delta) : "—"}</span>
+        <span class="num" style="font-size:13px; color:var(--sec);">mV imbalance</span>
+        <span class="lbl" style="font-size:10px; font-weight:600; margin-left:auto; border-radius:999px; padding:3px 9px; ${top.delta > 60 ? "color:var(--crit); border:1px solid rgba(242,109,109,.4); background:rgba(242,109,109,.08);" : top.delta > 40 ? "color:var(--warn); border:1px solid rgba(245,183,61,.4); background:rgba(245,183,61,.08);" : "color:var(--good); border:1px solid rgba(63,214,140,.35); background:rgba(63,214,140,.1);"}">${top.delta > 60 ? "Check" : top.delta > 40 ? "Watch" : "Healthy"}</span>
+      </div>
+      <div class="grid3">
+        <div><div class="lbl" style="font-size:9.5px; color:var(--mut);">Max cell</div><div class="num" style="font-size:13px; font-weight:600;">${cellV(top.maxV)} V</div><div class="num" style="font-size:10px; color:var(--good);">#${top.maxN ?? "—"}</div></div>
+        <div><div class="lbl" style="font-size:9.5px; color:var(--mut);">Min cell</div><div class="num" style="font-size:13px; font-weight:600;">${cellV(top.minV)} V</div><div class="num" style="font-size:10px; color:var(--crit);">#${top.minN ?? "—"}</div></div>
+        <div><div class="lbl" style="font-size:9.5px; color:var(--mut);">Pack</div><div class="num" style="font-size:13px; font-weight:600;">${fmt(top.packV,1)} V</div><div class="num" style="font-size:10px; color:var(--mut);">${top.packI != null ? Math.abs(top.packI).toFixed(1) + " A tail" : ""}</div></div>
+      </div>
+    </div>
+    ${spark ? `<div class="card" style="padding:13px 15px;"><div class="lbl tile-lbl" style="margin-bottom:6px;">ΔV through the recorded window</div>${spark}</div>` : ""}
+    <div class="card" style="padding:13px 15px; display:flex; flex-direction:column; gap:2px;">
+      <div class="lbl tile-lbl" style="margin-bottom:6px;">Recorded window extremes</div>
+      <div class="rowline"><span>Pack voltage</span><span class="num">${exRow("packV", "V", v => v.toFixed(1))}</span></div>
+      <div class="rowline"><span>Max cell</span><span class="num">${exRow("maxV", "V", v => (v/1000).toFixed(3))} · <span style="color:var(--good);">#${top.maxN ?? "—"}</span></span></div>
+      <div class="rowline"><span>Min cell</span><span class="num">${exRow("minV", "V", v => (v/1000).toFixed(3))} · <span style="color:var(--crit);">#${top.minN ?? "—"}</span></span></div>
+      <div class="rowline"><span>ΔV</span><span class="num">${exRow("delta", "mV", v => Math.round(v))}</span></div>
+      <div class="rowline"><span>Cell temp</span><span class="num">${exRow("maxT", "°C", v => Math.round(v))}</span></div>
+      <div class="rowline"><span>Energy in (window / full)</span><span class="num">${fmt(r.eIn,2)} / ${fmt(r.eInFull,2)} kWh</span></div>
+    </div>
+    <button class="primary" onclick="exportCsv(${r.id})">Export CSV</button>`;
+  $("ovReport").classList.remove("hidden");
+}
+
+function exportCsv(id) {
+  const r = getReports().find(x => x.id === id);
+  if (!r) return;
+  const keys = ["t", "soc", "packV", "packI", "maxV", "minV", "maxN", "minN", "delta", "maxT", "minT"];
+  const rows = [keys.join(",")];
+  for (const s of r.samples) rows.push(keys.map(k => k === "t" ? new Date(s.t).toISOString() : (s[k] ?? "")).join(","));
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([rows.join("\n")], { type: "text/csv" }));
+  a.download = "charge-report-" + new Date(r.start).toISOString().slice(0, 16).replace(/[T:]/g, "-") + ".csv";
+  a.click();
+}
+
+function renderReportsList() {
+  const list = $("reportsList");
+  const all = getReports();
+  list.innerHTML = all.length ? "" : `<div class="num" style="color:var(--mut); font-size:12px;">No charge reports yet. They appear after a charge passes 95%.</div>`;
+  for (const r of all) {
+    const d = document.createElement("div");
+    d.className = "card"; d.style.cssText = "padding:12px 14px; display:flex; justify-content:space-between; align-items:center; cursor:pointer;";
+    d.innerHTML = `<div>
+        <div class="num" style="font-size:13px; font-weight:600;">${new Date(r.start).toLocaleDateString()} · ${new Date(r.start).toTimeString().slice(0,5)}</div>
+        <div class="num" style="font-size:10.5px; color:var(--mut);">${fmt(r.socStart,0)}→${fmt(r.socEnd,0)}% · top ΔV ${r.top && r.top.delta != null ? Math.round(r.top.delta) : "?"} mV</div>
+      </div><span style="color:var(--mut);">›</span>`;
+    d.onclick = () => { $("ovReports").classList.add("hidden"); showReport(r); };
+    list.appendChild(d);
+  }
+}
+
+/* ============================ Tools ============================ */
+async function scanRange() {
+  if (S.scanning) { S.scanning = false; return; }
+  const from = parseInt($("scanFrom").value, 16), to = parseInt($("scanTo").value, 16);
+  if (isNaN(from) || isNaN(to) || to < from) return;
+  const wasPolling = S.polling; S.polling = false; S.scanning = true;
+  $("btnScan").textContent = "Stop";
+  await new Promise(r => setTimeout(r, 500));
+  await elm.send("ATST20", 600);
+  const tbody = $("scanTbl").querySelector("tbody");
+  for (let did = from; did <= to && S.scanning; did++) {
+    const hex = did.toString(16).toUpperCase().padStart(4, "0");
+    const bytes = udsPayload(await elm.send("22" + hex, 700), "62", hex);
+    if (bytes && bytes.length) {
+      const u16 = [];
+      for (let i = 0; i + 1 < bytes.length; i += 2) u16.push((bytes[i] << 8) | bytes[i + 1]);
+      const cellish = u16.filter(v => v >= 2500 && v <= 4400).length;
+      const note = bytes.length > 6 && cellish >= 3 ? "🔋 possible cell array" : cellish ? "cell-like" : "";
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>$${hex}</td><td>${bytes.length}</td><td>${bytes.map(b => b.toString(16).padStart(2, "0")).join(" ")}</td><td style="color:${note.startsWith("🔋") ? "var(--good)" : "var(--mut)"}">${note}</td>`;
+      tbody.appendChild(tr);
+    }
+  }
+  await elm.send("ATST64", 600);
+  S.scanning = false; $("btnScan").textContent = "Scan";
+  if (wasPolling) pollLoop();
+}
+
+async function readAllOnce() {
+  const wasPolling = S.polling; S.polling = false;
+  await new Promise(r => setTimeout(r, 500));
+  const tbody = $("allTbl").querySelector("tbody"); tbody.innerHTML = "";
+  for (const [did, name, len, f, o, unit] of TDS_FULL) {
+    const bytes = udsPayload(await elm.send("22" + did, 1200), "62", did);
+    let val = "—";
+    if (bytes && bytes.length >= len) {
+      let raw = 0; for (let i = 0; i < len; i++) raw = (raw << 8) | bytes[i];
+      val = (raw * f + o).toFixed(f < 1 ? 2 : 0) + " " + unit;
+    }
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td style="color:var(--mut);">$${did}</td><td>${name}</td><td class="num" style="color:var(--good);">${val}</td>`;
+    tbody.appendChild(tr);
+  }
+  if (wasPolling) pollLoop();
+}
+
+/* ============================ Wire-up ============================ */
+for (const p of PROFILES) {
+  const o = document.createElement("option");
+  o.value = p.id; o.textContent = `${p.make} ${p.name}`;
+  $("selProfile").appendChild(o);
+}
+$("selProfile").onchange = () => {
+  const p = PROFILES.find(x => x.id === $("selProfile").value);
+  if (p) setProfile(p, "manually selected");
+};
+$("btnConnect").onclick = () => connectFlow(false);
+$("btnStart").onclick = startMonitoring;
+$("btnNight").onclick = enterNight;
+$("btnDay").onclick = exitNight;
+$("btnTools").onclick = () => $("ovTools").classList.remove("hidden");
+$("btnToolsClose").onclick = () => $("ovTools").classList.add("hidden");
+$("btnReports").onclick = () => { renderReportsList(); $("ovReports").classList.remove("hidden"); };
+$("btnReportsClose").onclick = () => $("ovReports").classList.add("hidden");
+$("btnScan").onclick = scanRange;
+$("btnReadAll").onclick = readAllOnce;
+$("btnDisconnect").onclick = () => { elm.disconnect(); show("connect"); $("ovTools").classList.add("hidden"); };
+$("btnSend").onclick = async () => { const c = $("termIn").value.trim(); if (c) { $("termIn").value = ""; await elm.send(c.toUpperCase(), 4000); } };
+$("termIn").addEventListener("keydown", e => { if (e.key === "Enter") $("btnSend").click(); });
+
+/* restore profile + compat check */
+(function init() {
+  const saved = localStorage.getItem("evm_profile");
+  const p = PROFILES.find(x => x.id === saved) || PROFILES[0];
+  setProfile(p, saved ? "remembered from last session" : "default — connect to auto-detect");
+  if (!navigator.bluetooth) {
+    $("compatWarn").style.display = "block";
+    $("compatWarn").textContent = "⚠ Web Bluetooth is not available here. Use Chrome or Edge on Android (or desktop), over HTTPS. Classic-Bluetooth-only ELM327 adapters won't work — you need a BLE (v4+) adapter such as vGate iCar Pro BLE4 or vLinker.";
+  } else {
+    connectFlow(true);   // silent reconnect attempt
+  }
+  if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
+})();
+window.exportCsv = exportCsv;
+</script>
+</body>
+</html>

@@ -1,0 +1,511 @@
+<title>Punch EV BMS Dashboard</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --bg: #0b0e13;
+    --panel: #121824;
+    --panel2: #1c2536;
+    --border: #232d40;
+    --ink: #e8edf6;
+    --sec: #93a1b8;
+    --mut: #5c6b84;
+    --accent: #4d9fff;
+    --good: #3fd68c;
+    --crit: #f26d6d;
+    --warn: #f5b73d;
+  }
+  body { background: var(--bg); color: var(--ink); font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; }
+  .lbl { font-family: 'Barlow Condensed', 'Arial Narrow', sans-serif; text-transform: uppercase; letter-spacing: 0.09em; }
+  .num { font-variant-numeric: tabular-nums; }
+  .wrap { max-width: 1440px; margin: 0 auto; padding: 28px 24px 60px; }
+  h1 { font-family: 'Barlow Condensed', sans-serif; font-size: 30px; font-weight: 700; margin: 0; letter-spacing: 0.03em; }
+  .sub { color: var(--sec); font-size: 13px; margin-top: 6px; max-width: 70ch; line-height: 1.5; }
+  .screens { display: flex; gap: 56px; overflow-x: auto; padding: 30px 4px 10px; align-items: flex-start; }
+  .frame { flex: 0 0 auto; width: 390px; }
+  .frame h2 { font-family: 'Barlow Condensed', sans-serif; font-size: 15px; font-weight: 600; color: var(--sec); margin: 0 0 4px 2px; letter-spacing: 0.06em; text-transform: uppercase; }
+  .frame .why { font-size: 11px; color: var(--mut); margin: 0 0 10px 2px; line-height: 1.5; min-height: 32px; }
+  .phone { width: 390px; height: 844px; border-radius: 26px; border: 1px solid var(--border); overflow: hidden; background: var(--bg); box-shadow: 0 18px 50px rgba(0,0,0,0.5); }
+  .lead .phone { border-color: #35507a; }
+  /* shared mock bits */
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; }
+  .suggest { margin-top: 44px; }
+  .suggest h2 { font-family: 'Barlow Condensed', sans-serif; font-size: 20px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin: 0 0 4px; }
+  .suggest p { color: var(--sec); font-size: 12.5px; margin: 0 0 18px; }
+  .sgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+  .sitem { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 13px 15px; display: flex; flex-direction: column; gap: 4px; }
+  .sitem .t { font-size: 13px; font-weight: 600; color: var(--ink); display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+  .sitem .t code { color: var(--accent); font-size: 11px; font-weight: 400; white-space: nowrap; }
+  .sitem .d { font-size: 11.5px; color: var(--mut); line-height: 1.5; }
+</style>
+
+<div class="wrap">
+  <h1>Punch EV — BMS Dashboard mock</h1>
+  <div class="sub">Phone-first (390 px — this runs in Chrome on Android over Web Bluetooth). All nine requested parameters on one screen, no scrolling while driving. Sample values are realistic for a 102S LFP pack at 68% SOC. Pick a direction — or mix.</div>
+
+  <div class="screens">
+
+    <!-- ============ LEADING DIRECTION ============ -->
+    <div class="frame lead">
+      <h2>Leading — instrument panel</h2>
+      <p class="why">Everything visible at once, grouped by system: charge → power → cells → thermals. Green/red reserved strictly for max/min cell.</p>
+      <div class="phone">
+        <div style="height: 100%; display: flex; flex-direction: column; gap: 12px; padding: 18px 16px 14px; box-sizing: border-box;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div class="lbl" style="font-size: 19px; font-weight: 700;">Punch EV</div>
+              <div class="lbl" style="font-size: 11px; font-weight: 500; color: var(--mut);">BMS Live · 785/78D</div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <div style="display: flex; align-items: center; gap: 7px; background: var(--panel); border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px;">
+                <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--good); box-shadow: 0 0 6px var(--good);"></span>
+                <span class="lbl" style="font-size: 11px; font-weight: 600; color: var(--sec);">Connected</span>
+              </div>
+              <div style="width: 32px; height: 32px; background: var(--panel); border: 1px solid var(--border); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="#93a1b8" stroke-width="1.4"><path d="M13.5 9.5A6 6 0 0 1 6.5 2.5a6 6 0 1 0 7 7z"></path></svg>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="padding: 16px 16px 14px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+              <div>
+                <div class="lbl" style="font-size: 11px; font-weight: 600; color: var(--mut);">State of charge</div>
+                <div style="display: flex; align-items: baseline; gap: 4px;">
+                  <span class="num" style="font-size: 46px; font-weight: 600; line-height: 1.1;">68.4</span>
+                  <span class="num" style="font-size: 18px; color: var(--sec);">%</span>
+                </div>
+              </div>
+              <div style="text-align: right;">
+                <div class="lbl" style="font-size: 11px; font-weight: 600; color: var(--mut);">SOH</div>
+                <div style="display: flex; align-items: baseline; gap: 3px; justify-content: flex-end;">
+                  <span class="num" style="font-size: 24px; font-weight: 600; color: var(--good);">97.5</span>
+                  <span class="num" style="font-size: 13px; color: var(--sec);">%</span>
+                </div>
+              </div>
+            </div>
+            <div style="height: 8px; border-radius: 4px; background: var(--panel2); position: relative; overflow: hidden;">
+              <div style="position: absolute; left: 0; top: 0; bottom: 0; width: 68.4%; border-radius: 4px; background: var(--accent);"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span class="num" style="font-size: 11px; color: var(--mut);">≈ 23.9 kWh usable</span>
+              <span class="num" style="font-size: 11px; color: var(--mut);">35 kWh · 102S LFP</span>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px;">
+            <div class="card" style="padding: 12px; display: flex; flex-direction: column; gap: 4px;">
+              <div class="lbl" style="font-size: 10px; font-weight: 600; color: var(--mut);">Power</div>
+              <span class="num" style="font-size: 22px; font-weight: 600;">4.21</span>
+              <div class="num" style="font-size: 10px; color: var(--sec);">kW · drive</div>
+            </div>
+            <div class="card" style="padding: 12px; display: flex; flex-direction: column; gap: 4px;">
+              <div class="lbl" style="font-size: 10px; font-weight: 600; color: var(--mut);">Current</div>
+              <span class="num" style="font-size: 22px; font-weight: 600;">12.4</span>
+              <div class="num" style="font-size: 10px; color: var(--sec);">A · discharge</div>
+            </div>
+            <div class="card" style="padding: 12px; display: flex; flex-direction: column; gap: 4px;">
+              <div class="lbl" style="font-size: 10px; font-weight: 600; color: var(--mut);">Pack</div>
+              <span class="num" style="font-size: 22px; font-weight: 600;">339.8</span>
+              <div class="num" style="font-size: 10px; color: var(--sec);">V · HV bus</div>
+            </div>
+          </div>
+
+          <div class="card" style="padding: 14px 16px; display: flex; flex-direction: column; gap: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div class="lbl" style="font-size: 11px; font-weight: 600; color: var(--mut);">Cell voltages</div>
+              <div style="display: flex; align-items: center; gap: 6px; background: var(--panel2); border-radius: 999px; padding: 4px 10px;">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="#93a1b8" stroke-width="1.5"><path d="M8 2v5l3 2"></path><circle cx="8" cy="8" r="6.2"></circle></svg>
+                <span class="lbl" style="font-size: 10px; font-weight: 600; color: var(--sec);">Balancing: idle</span>
+              </div>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;">
+              <div style="border-left: 2px solid var(--good); padding-left: 10px; display: flex; flex-direction: column; gap: 3px;">
+                <div class="lbl" style="font-size: 10px; font-weight: 600; color: var(--mut);">Max cell</div>
+                <div style="display: flex; align-items: baseline; gap: 4px;">
+                  <span class="num" style="font-size: 24px; font-weight: 600;">3.342</span>
+                  <span class="num" style="font-size: 12px; color: var(--sec);">V</span>
+                </div>
+                <div class="num" style="font-size: 11px; color: var(--good);">cell #15</div>
+              </div>
+              <div style="border-left: 2px solid var(--crit); padding-left: 10px; display: flex; flex-direction: column; gap: 3px;">
+                <div class="lbl" style="font-size: 10px; font-weight: 600; color: var(--mut);">Min cell</div>
+                <div style="display: flex; align-items: baseline; gap: 4px;">
+                  <span class="num" style="font-size: 24px; font-weight: 600;">3.318</span>
+                  <span class="num" style="font-size: 12px; color: var(--sec);">V</span>
+                </div>
+                <div class="num" style="font-size: 11px; color: var(--crit);">cell #51</div>
+              </div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+              <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                <span class="lbl" style="font-size: 10px; font-weight: 600; color: var(--mut);">Imbalance ΔV</span>
+                <span style="display: flex; align-items: baseline; gap: 4px;">
+                  <span class="num" style="font-size: 15px; font-weight: 600; color: var(--good);">24</span>
+                  <span class="num" style="font-size: 11px; color: var(--sec);">mV · healthy &lt; 40</span>
+                </span>
+              </div>
+              <div style="height: 6px; border-radius: 3px; background: var(--panel2); position: relative;">
+                <div style="position: absolute; left: 0; top: 0; bottom: 0; width: 24%; border-radius: 3px; background: var(--good);"></div>
+                <div style="position: absolute; left: 40%; top: -2px; bottom: -2px; width: 1px; background: var(--warn);"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;">
+            <div class="lbl" style="font-size: 11px; font-weight: 600; color: var(--mut);">Battery temperature</div>
+            <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px;">
+              <div style="display: flex; flex-direction: column; gap: 3px;">
+                <div class="lbl" style="font-size: 10px; font-weight: 600; color: var(--mut);">Max</div>
+                <div style="display: flex; align-items: baseline; gap: 3px;">
+                  <span class="num" style="font-size: 22px; font-weight: 600;">34</span>
+                  <span class="num" style="font-size: 12px; color: var(--sec);">°C</span>
+                </div>
+                <div class="num" style="font-size: 10px; color: var(--mut);">probe 3</div>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 3px;">
+                <div class="lbl" style="font-size: 10px; font-weight: 600; color: var(--mut);">Min</div>
+                <div style="display: flex; align-items: baseline; gap: 3px;">
+                  <span class="num" style="font-size: 22px; font-weight: 600;">31</span>
+                  <span class="num" style="font-size: 12px; color: var(--sec);">°C</span>
+                </div>
+                <div class="num" style="font-size: 10px; color: var(--mut);">probe 9</div>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 3px;">
+                <div class="lbl" style="font-size: 10px; font-weight: 600; color: var(--mut);">Average</div>
+                <div style="display: flex; align-items: baseline; gap: 3px;">
+                  <span class="num" style="font-size: 22px; font-weight: 600;">32</span>
+                  <span class="num" style="font-size: 12px; color: var(--sec);">°C</span>
+                </div>
+                <div class="num" style="font-size: 10px; color: var(--mut);">12 probes</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="padding: 10px 14px; display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; flex-direction: column; gap: 1px;">
+              <span class="lbl" style="font-size: 9.5px; font-weight: 600; color: var(--mut);">Session out</span>
+              <span class="num" style="font-size: 14px; font-weight: 600;">3.24 <span style="font-size: 10px; color: var(--sec); font-weight: 400;">kWh</span></span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 1px;">
+              <span class="lbl" style="font-size: 9.5px; font-weight: 600; color: var(--mut);">In</span>
+              <span class="num" style="font-size: 14px; font-weight: 600;">0.41 <span style="font-size: 10px; color: var(--sec); font-weight: 400;">kWh</span></span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 1px;">
+              <span class="lbl" style="font-size: 9.5px; font-weight: 600; color: var(--mut);">Efficiency</span>
+              <span class="num" style="font-size: 14px; font-weight: 600;">118 <span style="font-size: 10px; color: var(--sec); font-weight: 400;">Wh/km</span></span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 1px; text-align: right;">
+              <span class="lbl" style="font-size: 9.5px; font-weight: 600; color: var(--mut);">Trip</span>
+              <span class="num" style="font-size: 14px; font-weight: 600;">27.4 <span style="font-size: 10px; color: var(--sec); font-weight: 400;">km</span></span>
+            </div>
+          </div>
+
+          <div style="margin-top: auto; display: flex; justify-content: space-between; padding: 0 2px;">
+            <span class="num" style="font-size: 10px; color: var(--mut);">poll 0.5 s · 412 reads · 0 misses</span>
+            <span class="num" style="font-size: 10px; color: var(--mut);">updated 14:32:08</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ ALT A: GAUGE CLUSTER ============ -->
+    <div class="frame">
+      <h2>Alt A — gauge cluster (sketch)</h2>
+      <p class="why">Feels like a car cluster: one big SOC dial, glanceable. Trade-off: fewer numbers visible at once.</p>
+      <div class="phone" style="background: #14171c;">
+        <div style="height: 100%; display: flex; flex-direction: column; gap: 16px; padding: 20px 16px; box-sizing: border-box; color: #d5dbe4;">
+          <div style="display: flex; justify-content: center; padding-top: 20px;">
+            <div style="position: relative; width: 230px; height: 230px;">
+              <svg width="230" height="230" viewBox="0 0 230 230">
+                <circle cx="115" cy="115" r="98" fill="none" stroke="#2a2f37" stroke-width="14"></circle>
+                <path d="M 115 213 A 98 98 0 1 1 197 61" fill="none" stroke="#8f9aa8" stroke-width="14" stroke-linecap="round"></path>
+              </svg>
+              <div style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;">
+                <span class="num" style="font-size: 52px; font-weight: 600; color: #e9edf3;">68</span>
+                <span class="lbl" style="font-size: 12px; color: #79828f;">SOC %</span>
+              </div>
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;">
+            <div style="border: 1px dashed #3a414b; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; align-items: center; gap: 6px;">
+              <svg width="110" height="60" viewBox="0 0 110 60">
+                <path d="M 8 56 A 48 48 0 0 1 102 56" fill="none" stroke="#2a2f37" stroke-width="9"></path>
+                <path d="M 8 56 A 48 48 0 0 1 62 9" fill="none" stroke="#8f9aa8" stroke-width="9" stroke-linecap="round"></path>
+              </svg>
+              <span class="num" style="font-size: 20px; font-weight: 600;">4.2 kW</span>
+              <span class="lbl" style="font-size: 10px; color: #79828f;">Power</span>
+            </div>
+            <div style="border: 1px dashed #3a414b; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; align-items: center; gap: 6px;">
+              <svg width="110" height="60" viewBox="0 0 110 60">
+                <path d="M 8 56 A 48 48 0 0 1 102 56" fill="none" stroke="#2a2f37" stroke-width="9"></path>
+                <path d="M 8 56 A 48 48 0 0 1 44 12" fill="none" stroke="#8f9aa8" stroke-width="9" stroke-linecap="round"></path>
+              </svg>
+              <span class="num" style="font-size: 20px; font-weight: 600;">32 °C</span>
+              <span class="lbl" style="font-size: 10px; color: #79828f;">Pack temp</span>
+            </div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; justify-content: space-between; border: 1px dashed #3a414b; border-radius: 10px; padding: 12px 14px;">
+              <span class="lbl" style="font-size: 12px; color: #79828f;">Cells max / min</span>
+              <span class="num" style="font-size: 13px;">3.342 #15 · 3.318 #51</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; border: 1px dashed #3a414b; border-radius: 10px; padding: 12px 14px;">
+              <span class="lbl" style="font-size: 12px; color: #79828f;">Pack V · A · ΔV</span>
+              <span class="num" style="font-size: 13px;">339.8 V · 12.4 A · 24 mV</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; border: 1px dashed #3a414b; border-radius: 10px; padding: 12px 14px;">
+              <span class="lbl" style="font-size: 12px; color: #79828f;">SOH · balancing</span>
+              <span class="num" style="font-size: 13px;">97.5 % · idle</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ ALT B: DENSE READOUT ============ -->
+    <div class="frame">
+      <h2>Alt B — dense readout (sketch)</h2>
+      <p class="why">The zero-decoration engineer view: one scan-down list, maximum data density, trivially extensible.</p>
+      <div class="phone" style="background: #101318;">
+        <div class="num" style="height: 100%; display: flex; flex-direction: column; padding: 24px 16px; box-sizing: border-box; font-size: 13px; color: #cfd6df;">
+          <div style="border-top: 1px solid #2a2f37;">
+            <div style="display: flex; justify-content: space-between; padding: 12px 4px; border-bottom: 1px solid #2a2f37;"><span style="color: #79828f;">SOC</span><span style="font-weight: 600; font-size: 15px;">68.4 %</span></div>
+            <div style="display: flex; justify-content: space-between; padding: 12px 4px; border-bottom: 1px solid #2a2f37;"><span style="color: #79828f;">SOH</span><span style="font-weight: 600; font-size: 15px;">97.5 %</span></div>
+            <div style="display: flex; justify-content: space-between; padding: 12px 4px; border-bottom: 1px solid #2a2f37;"><span style="color: #79828f;">PACK VOLTAGE</span><span style="font-weight: 600; font-size: 15px;">339.8 V</span></div>
+            <div style="display: flex; justify-content: space-between; padding: 12px 4px; border-bottom: 1px solid #2a2f37;"><span style="color: #79828f;">CURRENT</span><span style="font-weight: 600; font-size: 15px;">12.4 A</span></div>
+            <div style="display: flex; justify-content: space-between; padding: 12px 4px; border-bottom: 1px solid #2a2f37;"><span style="color: #79828f;">POWER</span><span style="font-weight: 600; font-size: 15px;">4.21 kW</span></div>
+            <div style="display: flex; justify-content: space-between; padding: 12px 4px; border-bottom: 1px solid #2a2f37;"><span style="color: #79828f;">CELL MAX</span><span style="font-weight: 600; font-size: 15px;">3.342 V · #15</span></div>
+            <div style="display: flex; justify-content: space-between; padding: 12px 4px; border-bottom: 1px solid #2a2f37;"><span style="color: #79828f;">CELL MIN</span><span style="font-weight: 600; font-size: 15px;">3.318 V · #51</span></div>
+            <div style="display: flex; justify-content: space-between; padding: 12px 4px; border-bottom: 1px solid #2a2f37;"><span style="color: #79828f;">DELTA</span><span style="font-weight: 600; font-size: 15px;">24 mV</span></div>
+            <div style="display: flex; justify-content: space-between; padding: 12px 4px; border-bottom: 1px solid #2a2f37;"><span style="color: #79828f;">TEMP MAX / MIN</span><span style="font-weight: 600; font-size: 15px;">34 / 31 °C</span></div>
+            <div style="display: flex; justify-content: space-between; padding: 12px 4px; border-bottom: 1px solid #2a2f37;"><span style="color: #79828f;">BALANCING</span><span style="font-weight: 600; font-size: 15px;">IDLE</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ FEATURE SCREENS ============ -->
+  <div class="suggest" style="margin-top: 34px;">
+    <h2>App screens — connect · night view · morning report</h2>
+    <p>There is only ONE panel. After connecting you always land on the instrument panel; when charging current is detected (or you tap the moon icon in its header) the same panel morphs into the dimmed night view below — no navigation, and the session recorder runs in both states. When the charge finishes, the morning report appears as a card on the panel.</p>
+  </div>
+  <div class="screens" style="padding-top: 16px;">
+
+    <!-- Connect & detect -->
+    <div class="frame">
+      <h2>1 · Connect &amp; auto-detect</h2>
+      <p class="why">First launch: pick the adapter once, watch the detection ladder, confirm. Next launches skip straight to the dashboard.</p>
+      <div class="phone">
+        <div style="height: 100%; display: flex; flex-direction: column; gap: 14px; padding: 26px 18px 18px; box-sizing: border-box;">
+          <div>
+            <div class="lbl" style="font-size: 22px; font-weight: 700;">Punch EV</div>
+            <div class="lbl" style="font-size: 11px; font-weight: 500; color: var(--mut);">Battery monitor</div>
+          </div>
+
+          <div class="card" style="padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+            <div class="lbl" style="font-size: 11px; font-weight: 600; color: var(--mut);">Detection</div>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="width: 16px; height: 16px; border-radius: 50%; background: var(--good); display: flex; align-items: center; justify-content: center;"><svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="#0b0e13" stroke-width="2"><path d="M1.5 5.5l2.5 2.5 4.5-6"></path></svg></span>
+                <span class="num" style="font-size: 12.5px; color: var(--sec);">Adapter linked · vGate iCar Pro BLE</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="width: 16px; height: 16px; border-radius: 50%; background: var(--good); display: flex; align-items: center; justify-content: center;"><svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="#0b0e13" stroke-width="2"><path d="M1.5 5.5l2.5 2.5 4.5-6"></path></svg></span>
+                <span class="num" style="font-size: 12.5px; color: var(--sec);">CAN 500k · ELM ready</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="width: 16px; height: 16px; border-radius: 50%; background: var(--good); display: flex; align-items: center; justify-content: center;"><svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="#0b0e13" stroke-width="2"><path d="M1.5 5.5l2.5 2.5 4.5-6"></path></svg></span>
+                <span class="num" style="font-size: 12.5px; color: var(--sec);">VIN · MAT833•••••121034</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--accent); box-sizing: border-box;"></span>
+                <span class="num" style="font-size: 12.5px; color: var(--ink);">BMS on 785/78D · responding</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="padding: 16px; border-color: #35507a; display: flex; flex-direction: column; gap: 8px;">
+            <div class="lbl" style="font-size: 11px; font-weight: 600; color: var(--accent);">Detected vehicle</div>
+            <div class="lbl" style="font-size: 20px; font-weight: 700;">Punch EV Long Range</div>
+            <div class="num" style="font-size: 11.5px; color: var(--sec);">35 kWh · 102S LFP · Gen 2 Ziptron</div>
+            <div class="num" style="font-size: 11px; color: var(--mut);">matched from VIN prefix MAT833</div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 10px; margin-top: auto;">
+            <div style="background: var(--accent); color: #0b0e13; border-radius: 12px; padding: 15px; text-align: center;">
+              <span class="lbl" style="font-size: 14px; font-weight: 700;">Start monitoring</span>
+            </div>
+            <div style="text-align: center;">
+              <span class="num" style="font-size: 11px; color: var(--mut); border-bottom: 1px solid var(--border); padding-bottom: 1px;">Not your car? Choose model</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Charge watch -->
+    <div class="frame lead">
+      <h2>2 · Same panel — night view while charging</h2>
+      <p class="why">Not a separate screen: the instrument panel morphs into this when charging is detected (or via the moon toggle). Wake-lock on, near-black OLED palette, dims after 30 s — tap to brighten, tap moon to return to day view.</p>
+      <div class="phone" style="background: #000000;">
+        <div style="height: 100%; display: flex; flex-direction: column; gap: 14px; padding: 24px 20px 18px; box-sizing: border-box;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="width: 9px; height: 9px; border-radius: 50%; background: var(--warn); box-shadow: 0 0 8px var(--warn);"></span>
+              <span class="lbl" style="font-size: 12px; font-weight: 600; color: #8a97ab;">Recorder armed · starts at 95%</span>
+            </div>
+            <span class="lbl" style="font-size: 11px; font-weight: 600; color: #55627a;">wake lock on</span>
+          </div>
+
+          <div style="text-align: center; padding: 26px 0 6px;">
+            <div style="display: flex; align-items: baseline; justify-content: center; gap: 6px;">
+              <span class="num" style="font-size: 92px; font-weight: 600; line-height: 1; color: #dfe7f3;">87.2</span>
+              <span class="num" style="font-size: 26px; color: #55627a;">%</span>
+            </div>
+            <div class="num" style="font-size: 13px; color: #55627a; margin-top: 10px;">100% ≈ 04:10</div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; text-align: center;">
+            <div style="display: flex; flex-direction: column; gap: 3px;">
+              <span class="num" style="font-size: 24px; font-weight: 600; color: #b7c3d6;">6.6</span>
+              <span class="lbl" style="font-size: 10px; color: #55627a;">kW in · AC</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 3px;">
+              <span class="num" style="font-size: 24px; font-weight: 600; color: #b7c3d6;">18.9</span>
+              <span class="lbl" style="font-size: 10px; color: #55627a;">Amps</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 3px;">
+              <span class="num" style="font-size: 24px; font-weight: 600; color: #b7c3d6;">349.6</span>
+              <span class="lbl" style="font-size: 10px; color: #55627a;">Pack V</span>
+            </div>
+          </div>
+
+          <div style="border-top: 1px solid #161b24; border-bottom: 1px solid #161b24; padding: 14px 2px; display: flex; flex-direction: column; gap: 12px; margin-top: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+              <span class="lbl" style="font-size: 11px; color: #55627a;">ΔV now</span>
+              <span><span class="num" style="font-size: 22px; font-weight: 600; color: #3fd68c;">26</span> <span class="num" style="font-size: 11px; color: #55627a;">mV</span></span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+              <span class="lbl" style="font-size: 11px; color: #55627a;">ΔV peak (95–100% window)</span>
+              <span class="num" style="font-size: 13px; color: #55627a;">— below 95%</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+              <span class="lbl" style="font-size: 11px; color: #55627a;">Cells max / min</span>
+              <span class="num" style="font-size: 13px; color: #b7c3d6;">3.464 #15 · 3.438 #51</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+              <span class="lbl" style="font-size: 11px; color: #55627a;">Temp max / min</span>
+              <span class="num" style="font-size: 13px; color: #b7c3d6;">33 / 30 °C</span>
+            </div>
+          </div>
+
+          <div style="margin-top: auto; display: flex; flex-direction: column; gap: 10px;">
+            <div style="text-align: center;">
+              <span class="num" style="font-size: 10.5px; color: #3a4356;">started 22:41 · recorder waits for 95% SOC · tap to brighten</span>
+            </div>
+            <div style="border: 1px solid #2a3346; border-radius: 12px; padding: 12px; text-align: center; display: flex; align-items: center; justify-content: center; gap: 8px;">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#8a97ab" stroke-width="1.4"><circle cx="8" cy="8" r="3.2"></circle><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.4 1.4M11.6 11.6L13 13M13 3l-1.4 1.4M4.4 11.6L3 13"></path></svg>
+              <span class="lbl" style="font-size: 12px; font-weight: 600; color: #8a97ab;">Day view · recording continues</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Morning report -->
+    <div class="frame">
+      <h2>3 · Morning report</h2>
+      <p class="why">What you wake up to. Recording runs only in the 95→100% window — where LFP imbalance actually shows — and freezes the snapshot at highest SOC before the pack relaxes flat.</p>
+      <div class="phone">
+        <div style="height: 100%; display: flex; flex-direction: column; gap: 12px; padding: 22px 16px 16px; box-sizing: border-box;">
+          <div>
+            <div class="lbl" style="font-size: 18px; font-weight: 700;">Charge session</div>
+            <div class="num" style="font-size: 11.5px; color: var(--mut);">Tue 22:41 → 03:12 · 68 → 100% · recorded 02:18 → 03:04</div>
+          </div>
+
+          <div class="card" style="padding: 16px; border-color: #35507a; display: flex; flex-direction: column; gap: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+              <span class="lbl" style="font-size: 11px; font-weight: 600; color: var(--accent);">Top of charge · 100.0% @ 03:04</span>
+            </div>
+            <div style="display: flex; align-items: baseline; gap: 6px;">
+              <span class="num" style="font-size: 44px; font-weight: 600; line-height: 1;">28</span>
+              <span class="num" style="font-size: 14px; color: var(--sec);">mV imbalance</span>
+              <span class="lbl" style="font-size: 10px; font-weight: 600; color: var(--good); margin-left: auto; background: rgba(63,214,140,0.1); border: 1px solid rgba(63,214,140,0.35); border-radius: 999px; padding: 3px 9px;">Healthy</span>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px;">
+              <div style="display: flex; flex-direction: column; gap: 2px;">
+                <span class="lbl" style="font-size: 9.5px; color: var(--mut);">Max cell</span>
+                <span class="num" style="font-size: 13px; font-weight: 600;">3.598 V</span>
+                <span class="num" style="font-size: 10px; color: var(--good);">#15</span>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 2px;">
+                <span class="lbl" style="font-size: 9.5px; color: var(--mut);">Min cell</span>
+                <span class="num" style="font-size: 13px; font-weight: 600;">3.570 V</span>
+                <span class="num" style="font-size: 10px; color: var(--crit);">#51</span>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 2px;">
+                <span class="lbl" style="font-size: 9.5px; color: var(--mut);">Pack</span>
+                <span class="num" style="font-size: 13px; font-weight: 600;">358.1 V</span>
+                <span class="num" style="font-size: 10px; color: var(--mut);">1.2 A tail</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="padding: 14px 16px; display: flex; flex-direction: column; gap: 8px;">
+            <div class="lbl" style="font-size: 11px; font-weight: 600; color: var(--mut);">ΔV through the recorded window · 95 → 100%</div>
+            <svg width="100%" height="84" viewBox="0 0 326 84">
+              <line x1="30" y1="8" x2="30" y2="64" stroke="#232d40" stroke-width="1"></line>
+              <line x1="30" y1="64" x2="318" y2="64" stroke="#232d40" stroke-width="1"></line>
+              <text x="26" y="14" fill="#5c6b84" font-size="9" text-anchor="end" font-family="IBM Plex Mono, monospace">32</text>
+              <text x="26" y="66" fill="#5c6b84" font-size="9" text-anchor="end" font-family="IBM Plex Mono, monospace">10</text>
+              <text x="30" y="78" fill="#5c6b84" font-size="9" text-anchor="middle" font-family="IBM Plex Mono, monospace">95%</text>
+              <text x="318" y="78" fill="#5c6b84" font-size="9" text-anchor="end" font-family="IBM Plex Mono, monospace">100%</text>
+              <polyline points="30,58 88,54 146,44 204,30 262,20 300,24 318,28" fill="none" stroke="#4d9fff" stroke-width="2" stroke-linejoin="round"></polyline>
+              <circle cx="262" cy="20" r="3.5" fill="#4d9fff"></circle>
+              <text x="262" y="10" fill="#93a1b8" font-size="9" text-anchor="middle" font-family="IBM Plex Mono, monospace">peak 31 @ 99%</text>
+            </svg>
+          </div>
+
+          <div class="card" style="padding: 14px 16px; display: flex; flex-direction: column; gap: 9px;">
+            <div class="lbl" style="font-size: 11px; font-weight: 600; color: var(--mut);">Recorded window · 95 → 100%</div>
+            <div style="display: flex; justify-content: space-between;"><span class="num" style="font-size: 11.5px; color: var(--sec);">Pack voltage</span><span class="num" style="font-size: 11.5px;">352.6 → 358.4 V</span></div>
+            <div style="display: flex; justify-content: space-between;"><span class="num" style="font-size: 11.5px; color: var(--sec);">Max cell</span><span class="num" style="font-size: 11.5px;">3.512 → 3.601 V · <span style="color: var(--good);">#15</span></span></div>
+            <div style="display: flex; justify-content: space-between;"><span class="num" style="font-size: 11.5px; color: var(--sec);">Min cell</span><span class="num" style="font-size: 11.5px;">3.494 → 3.572 V · <span style="color: var(--crit);">#51</span></span></div>
+            <div style="display: flex; justify-content: space-between;"><span class="num" style="font-size: 11.5px; color: var(--sec);">ΔV</span><span class="num" style="font-size: 11.5px;">11 → 31 mV</span></div>
+            <div style="display: flex; justify-content: space-between;"><span class="num" style="font-size: 11.5px; color: var(--sec);">Cell temp</span><span class="num" style="font-size: 11.5px;">30 → 34 °C</span></div>
+            <div style="display: flex; justify-content: space-between;"><span class="num" style="font-size: 11.5px; color: var(--sec);">Energy in (full charge)</span><span class="num" style="font-size: 11.5px;">11.6 kWh</span></div>
+          </div>
+
+          <div style="display: flex; gap: 10px; margin-top: auto;">
+            <div style="flex: 1; border: 1px solid var(--border); border-radius: 12px; padding: 12px; text-align: center;">
+              <span class="lbl" style="font-size: 12px; font-weight: 600; color: var(--sec);">Export CSV</span>
+            </div>
+            <div style="flex: 1; background: var(--accent); border-radius: 12px; padding: 12px; text-align: center;">
+              <span class="lbl" style="font-size: 12px; font-weight: 700; color: #0b0e13;">Save report</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SUGGESTED PARAMETERS ============ -->
+  <div class="suggest">
+    <h2>Suggested additions</h2>
+    <p>All confirmed readable from the DID maps we extracted — none require extra hardware. Worth deciding now which make the main screen vs. a second tab.</p>
+    <div class="sgrid">
+      <div class="sitem"><div class="t">Charge / discharge current limits <code>$347B/C</code></div><div class="d">Shows live BMS derating in heat or cold — explains "why is my car slow / charging slowly today".</div></div>
+      <div class="sitem"><div class="t">12 V battery voltage <code>$3492</code></div><div class="d">The #1 EV breakdown cause. One glance says if the aux battery is dying.</div></div>
+      <div class="sitem"><div class="t">HV insulation resistance <code>$3016*</code></div><div class="d">Key safety number; a falling trend predicts isolation faults before a warning light.</div></div>
+      <div class="sitem"><div class="t">Busbar + / − voltages <code>$3481/82</code></div><div class="d">Contactor and connection health — a growing gap vs. pack voltage means resistance building up.</div></div>
+      <div class="sitem"><div class="t">Coolant in / out temp <code>$3410/11</code></div><div class="d">Thermal system effectiveness; pair with compressor power from the BCS ECU.</div></div>
+      <div class="sitem"><div class="t">ΔV history sparkline <code>derived</code></div><div class="d">Imbalance trend across a drive/charge tells more than a single snapshot.</div></div>
+      <div class="sitem"><div class="t">Session energy in / out + Wh/km <code>derived + $A001</code></div><div class="d">Integrate V×I over the session; odometer from the VECU gives true efficiency.</div></div>
+      <div class="sitem"><div class="t">Charging view <code>derived</code></div><div class="d">When current is negative: charge power, charge type (AC/DC) and time-to-full estimate.</div></div>
+      <div class="sitem"><div class="t">Fault rank + DTC readout <code>$3013 + UDS 19</code></div><div class="d">BMS's own severity rank plus a read-codes button — turns the app into a diagnostic tool.</div></div>
+      <div class="sitem"><div class="t">HVIL &amp; relay states <code>$3004–3008*</code></div><div class="d">Pre-charge / main relay status — instant answer to "car won't go READY".</div></div>
+    </div>
+    <p style="margin-top: 14px; color: var(--mut); font-size: 11px;">* DID present in the TacoGotion $30xx family — needs a probe on the Punch's $34xx BMS to confirm the equivalent.</p>
+  </div>
+</div>

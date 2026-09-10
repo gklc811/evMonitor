@@ -1,0 +1,3896 @@
+{
+ "mcu": {
+  "source_db": "KPD_EV_MCU.INF",
+  "comm": {},
+  "dids": {
+   "$F197": {
+    "name": "Variant Dataset Identification Number (Variant Coding)",
+    "bytes": "32.0",
+    "subparams": [
+     {
+      "sub": "VARIANT DATASET IDENTIFICATION NUMBER",
+      "pos": "4",
+      "len": "32",
+      "res": "1",
+      "off": "0",
+      "unit": "None"
+     },
+     {
+      "sub": "Variant Dataset Identification Number (Variant Coding)",
+      "pos": "4",
+      "len": "2",
+      "res": "1",
+      "off": "0",
+      "unit": "None"
+     }
+    ]
+   },
+   "$0235": {
+    "name": "Max speed forward",
+    "bytes": "2.0",
+    "subparams": [
+     {
+      "sub": "Max speed Limit",
+      "pos": "4",
+      "len": "2",
+      "res": "0.00769230",
+      "off": "0",
+      "unit": "Kmph"
+     },
+     {
+      "sub": "Max speed forward",
+      "pos": "4",
+      "len": "2",
+      "res": "1",
+      "off": "0",
+      "unit": "rpm"
+     }
+    ]
+   },
+   "$F100": {
+    "name": "Customer motor serial number",
+    "bytes": "32.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$F101": {
+    "name": "Customer motor part number",
+    "bytes": "32.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$F102": {
+    "name": "Customer motor model number",
+    "bytes": "32.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$F10A": {
+    "name": "Downloading site",
+    "bytes": "32.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$F180": {
+    "name": "Boot software number",
+    "bytes": "22.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$F189": {
+    "name": "MCU vehicle manufacturer software number",
+    "bytes": "32.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$F18C": {
+    "name": "Supplier ECU Serial Number",
+    "bytes": "4.0",
+    "subparams": [
+     {
+      "sub": "MCU serial number",
+      "pos": "4",
+      "len": "10",
+      "res": "1",
+      "off": "0",
+      "unit": "None"
+     },
+     {
+      "sub": "Supplier ECU Serial Number",
+      "pos": "4",
+      "len": "4",
+      "res": "1",
+      "off": "0",
+      "unit": "None"
+     }
+    ]
+   },
+   "$F18E": {
+    "name": "MCU customer part number",
+    "bytes": "32.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$F190": {
+    "name": "Vehicle Identification Number (VIN)",
+    "bytes": "17.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$F191": {
+    "name": "TML ECU hardware number",
+    "bytes": "15.0",
+    "subparams": [
+     {
+      "sub": "MCU vehicle manufacturer hardware part number",
+      "pos": "4",
+      "len": "32",
+      "res": "1",
+      "off": "0",
+      "unit": "None"
+     },
+     {
+      "sub": "TML ECU hardware number",
+      "pos": "4",
+      "len": "15",
+      "res": "1",
+      "off": "0",
+      "unit": "None"
+     }
+    ]
+   },
+   "$F192": {
+    "name": "Supplier ECU part number",
+    "bytes": "4.0",
+    "subparams": [
+     {
+      "sub": "MCU part number",
+      "pos": "4",
+      "len": "20",
+      "res": "1",
+      "off": "0",
+      "unit": "None"
+     },
+     {
+      "sub": "Supplier ECU part number",
+      "pos": "4",
+      "len": "4",
+      "res": "1",
+      "off": "0",
+      "unit": "None"
+     }
+    ]
+   },
+   "$F193": {
+    "name": "MCU model number",
+    "bytes": "20.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$F195": {
+    "name": "MCU software version",
+    "bytes": "20.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$F198": {
+    "name": "Reprogramming Counter",
+    "bytes": "5.0",
+    "subparams": [
+     {
+      "sub": "Programming shop code",
+      "pos": "4",
+      "len": "6",
+      "res": "1",
+      "off": "0",
+      "unit": "None"
+     },
+     {
+      "sub": "Reprogramming Counter",
+      "pos": "4",
+      "len": "2",
+      "res": "1",
+      "off": "0",
+      "unit": "None"
+     }
+    ]
+   },
+   "$F199": {
+    "name": "Last reprogramming date (YYYY MM DD)",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$F1F0": {
+    "name": "Motor serial number",
+    "bytes": "10.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$F1F1": {
+    "name": "Motor part number",
+    "bytes": "20.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$F1F2": {
+    "name": "Motor model number",
+    "bytes": "20.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$140E": {
+    "name": "Motor Rotation Direction",
+    "bytes": "4.0"
+   },
+   "$140F": {
+    "name": "Maximum positive torque",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "Nm"
+   },
+   "$1410": {
+    "name": "Maximum negative torque",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "Nm"
+   },
+   "$1411": {
+    "name": "Torque Ramp",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "Nm/s"
+   },
+   "$1412": {
+    "name": "Absolute maximum forward speed",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "rpm"
+   },
+   "$1413": {
+    "name": "Start point of the traction derating zone in forward direction.",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "rpm"
+   },
+   "$1414": {
+    "name": "End point of the traction derating zone in forward direction",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "rpm"
+   },
+   "$1415": {
+    "name": "Start point of the regeneration derating zone in forward direction",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "rpm"
+   },
+   "$1416": {
+    "name": "End point of the regeneration derating zone in forward direction",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "rpm"
+   },
+   "$1417": {
+    "name": "Absolute maximum reverse speed",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "rpm"
+   },
+   "$1418": {
+    "name": "Start point of the traction derating zone in reverse direction",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "rpm"
+   },
+   "$1419": {
+    "name": "End point of the traction derating zone in reverse direction",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "rpm"
+   },
+   "$141A": {
+    "name": "Start point of the regeneration derating zone in reverse direction",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "rpm"
+   },
+   "$141B": {
+    "name": "End point of the regeneration derating zone in reverse direction",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "rpm"
+   },
+   "$141C": {
+    "name": "Phase Sequence",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$141D": {
+    "name": "CAN1 Baud Rate",
+    "bytes": "4.0"
+   },
+   "$141E": {
+    "name": "High Priority Base Address",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$141F": {
+    "name": "Low Priority Base Address",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$1420": {
+    "name": "Odin CAN1 Base Address",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$1421": {
+    "name": "Ctrl CAN Port Number",
+    "bytes": "4.0"
+   },
+   "$1422": {
+    "name": "TM4 Motor phase7",
+    "bytes": "0.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$1423": {
+    "name": "Proportional factor of the speed control PI controller.",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$1424": {
+    "name": "Integral factor of the speed control PI controller.",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$1425": {
+    "name": "CAN2 Baud Rate",
+    "bytes": "4.0"
+   },
+   "$1426": {
+    "name": "Odin CAN2 Base Address",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$1427": {
+    "name": "PhaseCableReversed7",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$1428": {
+    "name": "UDS CAN Port",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$1429": {
+    "name": "UDS Rx Address",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$142A": {
+    "name": "UDS Tx Address",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$142F": {
+    "name": "Increases and decreases the speed ramp for the speed control",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "rpm/s"
+   },
+   "$1430": {
+    "name": "TempCoilHigh1",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$1431": {
+    "name": "TempCoilHigh2",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$1432": {
+    "name": "TempCoilMax",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$1433": {
+    "name": "NbMotorTempSensor",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$1434": {
+    "name": "RemyMotorPhase.Offset",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$1435": {
+    "name": "ExtensionBaseAddress",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$1436": {
+    "name": "ActiveDetectTempPhaseConnect",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$1437": {
+    "name": "J1939 Use",
+    "bytes": "4.0"
+   },
+   "$1438": {
+    "name": "J1939 ECU Instance",
+    "bytes": "4.0"
+   },
+   "$1439": {
+    "name": "J1939 Identity Number",
+    "bytes": "4.0"
+   },
+   "$143A": {
+    "name": "MCU J1939 Source Address",
+    "bytes": "4.0"
+   },
+   "$1462": {
+    "name": "VMU J1939SourceAddress",
+    "bytes": "4.0"
+   },
+   "$14C0": {
+    "name": "Damping enable",
+    "bytes": "4.0"
+   },
+   "$14C1": {
+    "name": "Damping Minimum speed",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "rpm"
+   },
+   "$14C2": {
+    "name": "Damping maximum torque",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "Nm"
+   },
+   "$14C3": {
+    "name": "Damping speed 1",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "rpm"
+   },
+   "$14C4": {
+    "name": "Damping speed 2",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "rpm"
+   },
+   "$14C5": {
+    "name": "Damping factor 1",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$14C6": {
+    "name": "Damping factor 2",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$14C7": {
+    "name": "PosSensorReverseFromRotor",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$14C8": {
+    "name": "CreepTorque Communication GD",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$14C9": {
+    "name": "TorqueRampDownTime Communication GD",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "ms"
+   },
+   "$14CA": {
+    "name": "TorqueRampUpTime Communication GD",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "ms"
+   },
+   "$14CB": {
+    "name": "TotalToleranceTime Communication GD",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$14CC": {
+    "name": "LimpHomeMaxTorque Communication GD",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$14CD": {
+    "name": "SpeedRampUpTime Communication GD",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$14CE": {
+    "name": "Operational Communication GD",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$14CF": {
+    "name": "TorqueRampDownTime Position sensor GD",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$14D0": {
+    "name": "TorqueRampUpTime Position sensor GD",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$14D1": {
+    "name": "TotalToleranceTime Position sensor GD",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$14D2": {
+    "name": "TorqueRampUpTimeSpeedMode Position sensor GD",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$14D3": {
+    "name": "Operational Position sensor GD",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$142B": {
+    "name": "Cipher Key Part 1",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$142C": {
+    "name": "Cipher Key Part 2",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$142D": {
+    "name": "Cipher Key Part 3",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$142E": {
+    "name": "Cipher Key Part 4",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$140B": {
+    "name": "VAux",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "V"
+   },
+   "$140C": {
+    "name": "Battery Voltage",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "V"
+   },
+   "$144F": {
+    "name": "Battery Current",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "A"
+   },
+   "$1450": {
+    "name": "Chassis Fault Status",
+    "bytes": "4.0"
+   },
+   "$1451": {
+    "name": "MCU Ignition Status",
+    "bytes": "4.0"
+   },
+   "$1452": {
+    "name": "Emergency Stop",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$1403": {
+    "name": "MCU motor rotation number (lower 32 bits)",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "rotations"
+   },
+   "$1404": {
+    "name": "MCU maximum speed",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "Rad/s"
+   },
+   "$1405": {
+    "name": "MCU Total ON time",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "seconds"
+   },
+   "$1406": {
+    "name": "Motor maximum torque 8",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "Nm"
+   },
+   "$1407": {
+    "name": "Motor maximum speed 8",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "rpm"
+   },
+   "$1409": {
+    "name": "MCU CAN version major 9",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$140A": {
+    "name": "MCU CAN version minor 9",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$140D": {
+    "name": "MCU motor rotation number (upper 32 bits)",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "rotations"
+   },
+   "$143E": {
+    "name": "Operational mode",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$143F": {
+    "name": "Sequencerstatus",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$1440": {
+    "name": "wMecMes",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "Rad/s"
+   },
+   "$1441": {
+    "name": "Bootloader major",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$1442": {
+    "name": "Bootloader minor",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$1443": {
+    "name": "Bootloader delivery",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$1444": {
+    "name": "Bootloader changelist",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$1445": {
+    "name": "Application identification",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$1446": {
+    "name": "Application delivery",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$1447": {
+    "name": "Application changelist",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$1454": {
+    "name": "Application major",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$1455": {
+    "name": "Application minor",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$1457": {
+    "name": "ECU active software type",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$143B": {
+    "name": "Speed Command",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "rpm"
+   },
+   "$143C": {
+    "name": "Torque Command",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "Nm"
+   },
+   "$143D": {
+    "name": "Enable Manual Control",
+    "bytes": "4.0"
+   },
+   "$1448": {
+    "name": "Max Discharge Current",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "A"
+   },
+   "$1449": {
+    "name": "Max Charge Current",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "A"
+   },
+   "$144A": {
+    "name": "Operational Request",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$144B": {
+    "name": "Max Battery Voltage",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "V"
+   },
+   "$144C": {
+    "name": "Min Battery Voltage",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "V"
+   },
+   "$144D": {
+    "name": "Command Mode",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$144E": {
+    "name": "Operational Mode CC",
+    "bytes": "4.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$1453": {
+    "name": "Calibration Request",
+    "bytes": "4.0"
+   },
+   "$F1A0": {
+    "name": "Vehicle configuration Number",
+    "bytes": "15.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$F1A1": {
+    "name": "Parameter Part Number",
+    "bytes": "17.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$0202": {
+    "name": "Throttle Command",
+    "bytes": "2.0",
+    "res": "0.0030518509476",
+    "off": "0",
+    "unit": "%"
+   },
+   "$0203": {
+    "name": "Throttle multiplier",
+    "bytes": "2.0",
+    "res": "0.0078125",
+    "off": "0",
+    "unit": "%"
+   },
+   "$0204": {
+    "name": "Throttle Pot",
+    "bytes": "2.0",
+    "res": "0.00015259254738",
+    "off": "0",
+    "unit": "V"
+   },
+   "$0205": {
+    "name": "Brake Output",
+    "bytes": "2.0",
+    "res": "0.003051851",
+    "off": "0",
+    "unit": "%"
+   },
+   "$0206": {
+    "name": "Pot2 Raw",
+    "bytes": "2.0",
+    "res": "0.0030518509476",
+    "off": "0",
+    "unit": "%"
+   },
+   "$0207": {
+    "name": "Interlock",
+    "bytes": "2.0",
+    "res": "1",
+    "off": "0",
+    "unit": "ON/OFF"
+   },
+   "$0208": {
+    "name": "Analog1",
+    "bytes": "2.0",
+    "res": "0.00097751710655",
+    "off": "0",
+    "unit": "V"
+   },
+   "$0209": {
+    "name": "Analog2",
+    "bytes": "2.0",
+    "res": "0.00097751710655",
+    "off": "0",
+    "unit": "V"
+   },
+   "$020A": {
+    "name": "Switches",
+    "bytes": "2.0",
+    "res": "1",
+    "off": "0",
+    "unit": "Enum"
+   },
+   "$020B": {
+    "name": "Throttle Output",
+    "bytes": "0.0",
+    "res": "0.0030518509476",
+    "off": "0",
+    "unit": "%"
+   },
+   "$0210": {
+    "name": "Capacitor Voltage",
+    "bytes": "2.0",
+    "res": "0.015625",
+    "off": "0",
+    "unit": "V"
+   },
+   "$0211": {
+    "name": "Keyswitch voltage",
+    "bytes": "2.0",
+    "res": "0.01",
+    "off": "0",
+    "unit": "V"
+   },
+   "$0213": {
+    "name": "Motor RPM",
+    "bytes": "2.0",
+    "res": "1",
+    "off": "0",
+    "unit": "rpm"
+   },
+   "$0214": {
+    "name": "Motor Temperature",
+    "bytes": "2.0",
+    "res": "0.1",
+    "off": "0",
+    "unit": "\u00b0C"
+   },
+   "$0218": {
+    "name": "Controller current RMS",
+    "bytes": "2.0",
+    "res": "0.1",
+    "off": "0",
+    "unit": "A"
+   },
+   "$0219": {
+    "name": "Controller temperature",
+    "bytes": "2.0",
+    "res": "0.1",
+    "off": "0",
+    "unit": "\u00b0C"
+   },
+   "$021E": {
+    "name": "Motor Temp cutback",
+    "bytes": "2.0",
+    "res": "0.000244140625",
+    "off": "0",
+    "unit": "%"
+   },
+   "$021F": {
+    "name": "Control Temp Cutback",
+    "bytes": "2.0",
+    "res": "0.000244140625",
+    "off": "0",
+    "unit": "%"
+   },
+   "$0220": {
+    "name": "Under Voltage Cutback",
+    "bytes": "2.0",
+    "res": "0.000244140625",
+    "off": "0",
+    "unit": "%"
+   },
+   "$0221": {
+    "name": "Over voltage cutback",
+    "bytes": "2.0",
+    "res": "0.000244140625",
+    "off": "0",
+    "unit": "%"
+   },
+   "$022E": {
+    "name": "Begin Master pot",
+    "bytes": "2.0",
+    "res": "0.00015259254738",
+    "off": "0",
+    "unit": "V"
+   },
+   "$022F": {
+    "name": "End Master Pot",
+    "bytes": "2.0",
+    "res": "0.00015259254738",
+    "off": "0",
+    "unit": "V"
+   },
+   "$0230": {
+    "name": "Begin Backup pot",
+    "bytes": "2.0",
+    "res": "0.00015259254738",
+    "off": "0",
+    "unit": "V"
+   },
+   "$0231": {
+    "name": "End Backup pot",
+    "bytes": "2.0",
+    "res": "0.00015259254738",
+    "off": "0",
+    "unit": "V"
+   },
+   "$0233": {
+    "name": "Brake Deadband",
+    "bytes": "2.0",
+    "res": "0.00015259254738",
+    "off": "0",
+    "unit": "V"
+   },
+   "$0234": {
+    "name": "Brake Max",
+    "bytes": "2.0",
+    "res": "0.00015259254738",
+    "off": "0",
+    "unit": "V"
+   },
+   "$0236": {
+    "name": "Max speed reverse",
+    "bytes": "2.0",
+    "res": "1",
+    "off": "0",
+    "unit": "rpm"
+   },
+   "$22AB": {
+    "name": "Capacitor_Voltage",
+    "bytes": "10.0",
+    "subparams": [
+     {
+      "sub": "Capacitor_Voltage",
+      "pos": "4",
+      "len": "2",
+      "res": "0.015625",
+      "off": "0",
+      "unit": "Vdc"
+     },
+     {
+      "sub": "Current_RMS",
+      "pos": "6",
+      "len": "2",
+      "res": "0.1",
+      "off": "0",
+      "unit": "Arms"
+     },
+     {
+      "sub": "Motor_RPM",
+      "pos": "8",
+      "len": "2",
+      "res": "1",
+      "off": "0",
+      "unit": "RPM"
+     },
+     {
+      "sub": "Controller_Temperature",
+      "pos": "10",
+      "len": "2",
+      "res": "0.1",
+      "off": "0",
+      "unit": "\u00b0C"
+     },
+     {
+      "sub": "Motor_Temperature",
+      "pos": "12",
+      "len": "2",
+      "res": "0.1",
+      "off": "0",
+      "unit": "\u00b0C"
+     }
+    ]
+   },
+   "$F187": {
+    "name": "TML Container Part Number ( Assembly No)",
+    "bytes": "15.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$F19C": {
+    "name": "TML Software calibration identification Number",
+    "bytes": "16.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$F188": {
+    "name": "TML ECU software number",
+    "bytes": "15.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$F1A2": {
+    "name": "Programming Shop Code",
+    "bytes": "2.0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   }
+  }
+ },
+ "obc": {
+  "source_db": "KPD_EV_OBC.inf",
+  "comm": {
+   "TesterAddress": "0x1BDAE5F1",
+   "ECUAddress": "0x1BDAF1E5",
+   "DiagnosticMode": "0x03",
+   "ChangedBaudRate": "500000",
+   "AddressingMode": "128",
+   "ECUInitializationType": "70",
+   "GenerateLog": "TRUE",
+   "IsDiagnosticSessionrequired": "TRUE",
+   "KeyByte1": "0x00",
+   "Communication Mode": "1",
+   "InitLine": "2",
+   "InterByteDelay": "3",
+   "SendAlways8Bytes": "TRUE",
+   "CanFrameFormat": "2",
+   "LogFileName": "C:\\\\MCU"
+  },
+  "dids": {
+   "$F187": {
+    "name": "Vehicle Manufacturer Spare Part Number",
+    "bytes": "12.0"
+   },
+   "$F18A": {
+    "name": "System Supplier Identifier",
+    "bytes": "10.0"
+   },
+   "$F197": {
+    "name": "System Name",
+    "bytes": "10.0"
+   },
+   "$F193": {
+    "name": "Supplier ECU Hardware Version Number",
+    "bytes": "16.0"
+   },
+   "$F195": {
+    "name": "Supplier ECU Software Version Number",
+    "bytes": "16.0"
+   },
+   "$F18C": {
+    "name": "ECU Seria lNumber",
+    "bytes": "10.0"
+   },
+   "$F190": {
+    "name": "Vehicle Identification Number (VIN)",
+    "bytes": "17.0"
+   },
+   "$F194": {
+    "name": "Supplier ECU Hardware Number",
+    "bytes": "3.0"
+   },
+   "$F192": {
+    "name": "Supplier ECU Part Number",
+    "bytes": "3.0"
+   },
+   "$F18B": {
+    "name": "ECU Manufacturing Date",
+    "bytes": "4.0"
+   },
+   "$C610": {
+    "name": "Set current",
+    "bytes": "4.0"
+   },
+   "$C611": {
+    "name": "Reservation",
+    "bytes": "4.0"
+   },
+   "$C612": {
+    "name": "Battery voltage",
+    "bytes": "4.0"
+   },
+   "$C613": {
+    "name": "Output current",
+    "bytes": "4.0"
+   }
+  }
+ },
+ "dcdc": {
+  "source_db": "KPD_EV_DCDC.inf",
+  "comm": {},
+  "dids": {
+   "$F1F3": {
+    "name": "SAG Dataset Size",
+    "bytes": "4",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$F1F2": {
+    "name": "SAG Dataset Name",
+    "bytes": "12",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$F1F1": {
+    "name": "SAG Bootloader Name",
+    "bytes": "11",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$F1F0": {
+    "name": "SAG Software Name",
+    "bytes": "11",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$F187": {
+    "name": "vehicleManufacturerSparePartNumberDataIdentifier",
+    "bytes": "12",
+    "subparams": [
+     {
+      "sub": "Spare Part Number",
+      "pos": "4",
+      "len": "4",
+      "res": "1",
+      "off": "0",
+      "unit": "None"
+     },
+     {
+      "sub": "vehicleManufacturerSparePartNumberDataIdentifier",
+      "pos": "4",
+      "len": "12",
+      "res": "1",
+      "off": "0",
+      "unit": "None"
+     }
+    ]
+   },
+   "$F18C": {
+    "name": "ECUSerialNumberDataIdentifier",
+    "bytes": "10",
+    "subparams": [
+     {
+      "sub": "Serial Number",
+      "pos": "4",
+      "len": "4",
+      "res": "1",
+      "off": "0",
+      "unit": "None"
+     },
+     {
+      "sub": "ECUSerialNumberDataIdentifier",
+      "pos": "4",
+      "len": "10",
+      "res": "1",
+      "off": "0",
+      "unit": "None"
+     }
+    ]
+   },
+   "$F189": {
+    "name": "Ecu Identification",
+    "bytes": "13",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$F193": {
+    "name": "systemSupplierECUHardwareVersionNumberDataIdentifier",
+    "bytes": "16",
+    "subparams": [
+     {
+      "sub": "Hardware Version",
+      "pos": "4",
+      "len": "4",
+      "res": "1",
+      "off": "0",
+      "unit": "None"
+     },
+     {
+      "sub": "systemSupplierECUHardwareVersionNumberDataIdentifier",
+      "pos": "4",
+      "len": "16",
+      "res": "1",
+      "off": "0",
+      "unit": "None"
+     }
+    ]
+   },
+   "$F190": {
+    "name": "VINDataIdentifier",
+    "bytes": "17",
+    "subparams": [
+     {
+      "sub": "Vehicle Identification Number (VIN)",
+      "pos": "4",
+      "len": "17",
+      "res": "1",
+      "off": "0",
+      "unit": "None"
+     },
+     {
+      "sub": "VINDataIdentifier",
+      "pos": "4",
+      "len": "17",
+      "res": "1",
+      "off": "0",
+      "unit": "None"
+     }
+    ]
+   },
+   "$F18A": {
+    "name": "systemSupplierIdentifierDataIdentifier",
+    "bytes": "10",
+    "subparams": [
+     {
+      "sub": "Supplier Identifier",
+      "pos": "4",
+      "len": "10",
+      "res": "1",
+      "off": "0",
+      "unit": "None"
+     },
+     {
+      "sub": "systemSupplierIdentifierDataIdentifier",
+      "pos": "4",
+      "len": "10",
+      "res": "1",
+      "off": "0",
+      "unit": "None"
+     }
+    ]
+   },
+   "$F197": {
+    "name": "SystemName",
+    "bytes": "10",
+    "subparams": [
+     {
+      "sub": "System Name",
+      "pos": "4",
+      "len": "10",
+      "res": "1",
+      "off": "0",
+      "unit": "None"
+     },
+     {
+      "sub": "SystemName",
+      "pos": "4",
+      "len": "10",
+      "res": "1",
+      "off": "0",
+      "unit": "None"
+     }
+    ]
+   },
+   "$F195": {
+    "name": "SystemSupplierECUSoftwareVersionNumberDataIdentifier",
+    "bytes": "16",
+    "subparams": [
+     {
+      "sub": "Supplier ECU Software Version Number",
+      "pos": "4",
+      "len": "16",
+      "res": "1",
+      "off": "0",
+      "unit": "None"
+     },
+     {
+      "sub": "SystemSupplierECUSoftwareVersionNumberDataIdentifier",
+      "pos": "4",
+      "len": "16",
+      "res": "1",
+      "off": "0",
+      "unit": "None"
+     }
+    ]
+   },
+   "$F194": {
+    "name": "systemSupplierECUHardwareNumberDataIdentifier",
+    "bytes": "3",
+    "subparams": [
+     {
+      "sub": "Supplier ECU Hardware Number",
+      "pos": "4",
+      "len": "3",
+      "res": "1",
+      "off": "0",
+      "unit": "None"
+     },
+     {
+      "sub": "systemSupplierECUHardwareNumberDataIdentifier",
+      "pos": "4",
+      "len": "3",
+      "res": "1",
+      "off": "0",
+      "unit": "None"
+     }
+    ]
+   },
+   "$F192": {
+    "name": "systemSupplierECUHardwareNumberDataIdentifier",
+    "bytes": "3",
+    "subparams": [
+     {
+      "sub": "Supplier ECU Hardware Number",
+      "pos": "4",
+      "len": "3",
+      "res": "1",
+      "off": "0",
+      "unit": "None"
+     },
+     {
+      "sub": "systemSupplierECUHardwareNumberDataIdentifier",
+      "pos": "4",
+      "len": "3",
+      "res": "1",
+      "off": "0",
+      "unit": "None"
+     }
+    ]
+   },
+   "$F18B": {
+    "name": "ECU Manufacturing Date",
+    "bytes": "4",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$C710": {
+    "name": "Set current",
+    "bytes": "4",
+    "subparams": [
+     {
+      "sub": "Set voltage",
+      "pos": "4",
+      "len": "2",
+      "res": "0.1",
+      "off": "0",
+      "unit": "V"
+     },
+     {
+      "sub": "Set current",
+      "pos": "4",
+      "len": "2",
+      "res": "0.1",
+      "off": "0",
+      "unit": "A"
+     }
+    ]
+   },
+   "$C711": {
+    "name": "Reservation",
+    "bytes": "4",
+    "subparams": [
+     {
+      "sub": "Input current limitation",
+      "pos": "4",
+      "len": "1",
+      "res": "2",
+      "off": "0",
+      "unit": "A"
+     },
+     {
+      "sub": "Output current limitation",
+      "pos": "4",
+      "len": "1",
+      "res": "1",
+      "off": "0",
+      "unit": "A"
+     },
+     {
+      "sub": "Power limitation",
+      "pos": "4",
+      "len": "1",
+      "res": "100",
+      "off": "0",
+      "unit": "W"
+     },
+     {
+      "sub": "Reservation",
+      "pos": "4",
+      "len": "1",
+      "res": "1",
+      "off": "0",
+      "unit": "None"
+     }
+    ]
+   },
+   "$C712": {
+    "name": "Battery voltage",
+    "bytes": "4",
+    "subparams": [
+     {
+      "sub": "Input voltage",
+      "pos": "4",
+      "len": "1",
+      "res": "3",
+      "off": "0",
+      "unit": "V"
+     },
+     {
+      "sub": "Internal temperature",
+      "pos": "4",
+      "len": "1",
+      "res": "1",
+      "off": "-40",
+      "unit": "\u2103"
+     },
+     {
+      "sub": "Inner power supply voltage",
+      "pos": "4",
+      "len": "1",
+      "res": "0.1",
+      "off": "0",
+      "unit": "V"
+     },
+     {
+      "sub": "Battery voltage",
+      "pos": "4",
+      "len": "1",
+      "res": "0.2",
+      "off": "0",
+      "unit": "V"
+     }
+    ]
+   },
+   "$C713": {
+    "name": "Output current",
+    "bytes": "4",
+    "subparams": [
+     {
+      "sub": "Output voltage",
+      "pos": "4",
+      "len": "2",
+      "res": "0.1",
+      "off": "0",
+      "unit": "V"
+     },
+     {
+      "sub": "Output current",
+      "pos": "4",
+      "len": "2",
+      "res": "0.1",
+      "off": "0",
+      "unit": "A"
+     }
+    ]
+   },
+   "$C720": {
+    "name": "DCDC status bit",
+    "bytes": "4",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$F18b": {
+    "name": "ECUManufacturingDateDataIdentifier",
+    "bytes": "4",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   }
+  }
+ },
+ "hecu": {
+  "source_db": "KPD_EV_HECU.inf",
+  "comm": {
+   "TesterAddress": "0x1BDA27F9",
+   "ECUAddress": "0x1BDAF927",
+   "DiagnosticMode": "0x03",
+   "ChangedBaudRate": "250000",
+   "AddressingMode": "128",
+   "ECUInitializationType": "70",
+   "GenerateLog": "TRUE",
+   "IsDiagnosticSessionrequired": "TRUE",
+   "KeyByte1": "0x00",
+   "Communication Mode": "0",
+   "InitLine": "2",
+   "InterByteDelay": "3",
+   "SendAlways8Bytes": "TRUE",
+   "CanFrameFormat": "2",
+   "LogFileName": "C:\\\\HECU"
+  },
+  "dids": {
+   "$0A01": {
+    "name": "State of Charge for Derate",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "%"
+   },
+   "$0A02": {
+    "name": "State of Charge for AC Limit",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "%"
+   },
+   "$0A03": {
+    "name": "MaxRegenerativeTrq",
+    "bytes": "2",
+    "res": "1",
+    "off": "-3000",
+    "unit": "Nm"
+   },
+   "$0A04": {
+    "name": "Battery Cooling System Cutin temperature",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "DegC"
+   },
+   "$0A05": {
+    "name": "Battery Cooling System Cutoff temperature",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "DegC"
+   },
+   "$0A06": {
+    "name": "Axle Ratio",
+    "bytes": "2",
+    "res": "0.001",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0A07": {
+    "name": "Tyre Size",
+    "bytes": "2",
+    "res": "0.001",
+    "off": "0",
+    "unit": "m"
+   },
+   "$0A08": {
+    "name": "Charging Max current",
+    "bytes": "2",
+    "res": "0.1",
+    "off": "0",
+    "unit": "amp"
+   },
+   "$0A09": {
+    "name": "Charging max voltage",
+    "bytes": "2",
+    "res": "1",
+    "off": "0",
+    "unit": "V"
+   },
+   "$0A0A": {
+    "name": "Default accel pedal limp home mode",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$0A0B": {
+    "name": "Aux pressure cut out pressure",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$0A0C": {
+    "name": "Aux pressure cut in pressure",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$0A0D": {
+    "name": "Reserve enable",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0A0E": {
+    "name": "Accelerator interlock enable",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0A0F": {
+    "name": "Reserved",
+    "bytes": "0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$F187": {
+    "name": "TML container part number",
+    "bytes": "15",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$F188": {
+    "name": "TML ECU Software number",
+    "bytes": "15",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$F190": {
+    "name": "Vehicle Identification Number (VIN)",
+    "bytes": "17",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$F191": {
+    "name": "TML ECU hardware Part number",
+    "bytes": "15",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$F198": {
+    "name": "Reprogramming counter",
+    "bytes": "2",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$F199": {
+    "name": "Date of last programming in format [DD-MM-YYYY]",
+    "bytes": "4",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$F19C": {
+    "name": "TML software cal",
+    "bytes": "16",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$0100": {
+    "name": "Maximum forward vehicle speed- HECU",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "kmph"
+   },
+   "$0101": {
+    "name": "VCU Config_R",
+    "bytes": "10",
+    "subparams": [
+     {
+      "sub": "Maximum reverse vehicle speed - HECU",
+      "pos": "4",
+      "len": "1",
+      "res": "1",
+      "off": "0",
+      "unit": "kmph"
+     },
+     {
+      "sub": "Aux UnderVolt",
+      "pos": "4",
+      "len": "2",
+      "res": "0.001",
+      "off": "0",
+      "unit": "Volt"
+     },
+     {
+      "sub": "Drive BC OntoOffTime",
+      "pos": "6",
+      "len": "2",
+      "res": "1",
+      "off": "0",
+      "unit": "%"
+     },
+     {
+      "sub": "Soc Limp",
+      "pos": "8",
+      "len": "1",
+      "res": "1",
+      "off": "0",
+      "unit": "%"
+     },
+     {
+      "sub": "Battery Temp Limp",
+      "pos": "9",
+      "len": "1",
+      "res": "1",
+      "off": "0",
+      "unit": "\u00b0C"
+     },
+     {
+      "sub": "SoC Low CuttOff",
+      "pos": "10",
+      "len": "1",
+      "res": "1",
+      "off": "0",
+      "unit": "%"
+     },
+     {
+      "sub": "SoC High CuttOff",
+      "pos": "11",
+      "len": "1",
+      "res": "1",
+      "off": "0",
+      "unit": "%"
+     },
+     {
+      "sub": "Low SocFlashing",
+      "pos": "12",
+      "len": "1",
+      "res": "1",
+      "off": "0",
+      "unit": "%"
+     },
+     {
+      "sub": "Low SoC On",
+      "pos": "13",
+      "len": "1",
+      "res": "1",
+      "off": "0",
+      "unit": "%"
+     }
+    ]
+   },
+   "$0102": {
+    "name": "VCU Config_WR",
+    "bytes": "8",
+    "subparams": [
+     {
+      "sub": "Road speed limit - HECU",
+      "pos": "4",
+      "len": "1",
+      "res": "1",
+      "off": "0",
+      "unit": "kmph"
+     },
+     {
+      "sub": "Aux Critical Volt",
+      "pos": "4",
+      "len": "2",
+      "res": "0.001",
+      "off": "0",
+      "unit": "Volt"
+     },
+     {
+      "sub": "Drive BC OntoOffTime",
+      "pos": "6",
+      "len": "2",
+      "res": "1",
+      "off": "0",
+      "unit": "sec"
+     },
+     {
+      "sub": "Motor High Temp",
+      "pos": "8",
+      "len": "1",
+      "res": "1",
+      "off": "0",
+      "unit": "\u00b0C"
+     },
+     {
+      "sub": "Motor Over Temp",
+      "pos": "9",
+      "len": "1",
+      "res": "1",
+      "off": "0",
+      "unit": "\u00b0C"
+     },
+     {
+      "sub": "Controller High Temp",
+      "pos": "10",
+      "len": "1",
+      "res": "1",
+      "off": "0",
+      "unit": "\u00b0C"
+     },
+     {
+      "sub": "Controller Over Temp",
+      "pos": "11",
+      "len": "1",
+      "res": "1",
+      "off": "0",
+      "unit": "\u00b0C"
+     }
+    ]
+   },
+   "$0103": {
+    "name": "VCU SummaryHeaderDetails",
+    "bytes": "4",
+    "subparams": [
+     {
+      "sub": "Speed regeneration start",
+      "pos": "4",
+      "len": "1",
+      "res": "1",
+      "off": "10",
+      "unit": "kmph"
+     },
+     {
+      "sub": "Summary Data Length",
+      "pos": "4",
+      "len": "2",
+      "res": "1",
+      "off": "0",
+      "unit": "-"
+     },
+     {
+      "sub": "No Of Summary Snapshots",
+      "pos": "6",
+      "len": "2",
+      "res": "1",
+      "off": "0",
+      "unit": "-"
+     }
+    ]
+   },
+   "$0104": {
+    "name": "LV Battery Voltage set DCDC output",
+    "bytes": "2",
+    "res": "0.1",
+    "off": "0",
+    "unit": "V"
+   },
+   "$0105": {
+    "name": "Battery1 Cell Voltage Max",
+    "bytes": "2",
+    "res": "0.001",
+    "off": "0",
+    "unit": "V"
+   },
+   "$0106": {
+    "name": "Battery2 Cell Voltage Max",
+    "bytes": "2",
+    "res": "0.001",
+    "off": "0",
+    "unit": "V"
+   },
+   "$0107": {
+    "name": "Battery Cell Voltage Max for charging",
+    "bytes": "2",
+    "res": "0.001",
+    "off": "0",
+    "unit": "V"
+   },
+   "$0108": {
+    "name": "Battery Cell Voltage Max for balancing",
+    "bytes": "2",
+    "res": "0.001",
+    "off": "0",
+    "unit": "V"
+   },
+   "$0109": {
+    "name": "Battery1 Cell Voltage Min",
+    "bytes": "2",
+    "res": "0.001",
+    "off": "0",
+    "unit": "V"
+   },
+   "$010A": {
+    "name": "Battery2 Cell Voltage Min",
+    "bytes": "2",
+    "res": "0.001",
+    "off": "0",
+    "unit": "V"
+   },
+   "$010B": {
+    "name": "Battery Cell Voltage Min for derating (power derate)",
+    "bytes": "2",
+    "res": "0.001",
+    "off": "0",
+    "unit": "V"
+   },
+   "$010C": {
+    "name": "Battery Cell Voltage Min for stopping",
+    "bytes": "2",
+    "res": "0.001",
+    "off": "0",
+    "unit": "V"
+   },
+   "$010D": {
+    "name": "Battery pack1 State of charge",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "%"
+   },
+   "$010E": {
+    "name": "Battery pack2 State of charge",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "%"
+   },
+   "$010F": {
+    "name": "Battery State of charge low value for driving to trigger derate mode",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "%"
+   },
+   "$0200": {
+    "name": "Battery State of charge below which AC to be switched off",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "%"
+   },
+   "$0201": {
+    "name": "Battery pack1 State of Health",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "%"
+   },
+   "$0202": {
+    "name": "Battery pack2 State of Health",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "%"
+   },
+   "$F1A0": {
+    "name": "Vehicle configuration number VCN",
+    "bytes": "15",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$F1A1": {
+    "name": "Parameter part number",
+    "bytes": "17",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$F1A2": {
+    "name": "Programming Shop code",
+    "bytes": "10",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$0B00": {
+    "name": "Battery3 Cell Voltage Max",
+    "bytes": "2",
+    "res": "0.001",
+    "off": "0",
+    "unit": "V"
+   },
+   "$0B01": {
+    "name": "Battery3 Cell Voltage Min",
+    "bytes": "2",
+    "res": "0.001",
+    "off": "0",
+    "unit": "V"
+   },
+   "$0B02": {
+    "name": "Battery pack3 State of charge",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "%"
+   },
+   "$0B03": {
+    "name": "Battery pack3 State of Health",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "%"
+   },
+   "$0B04": {
+    "name": "Battery3 Cell Temperature Max",
+    "bytes": "1",
+    "res": "1",
+    "off": "-10",
+    "unit": "DegC"
+   },
+   "$0B05": {
+    "name": "Battery3 Cell Temperature Min",
+    "bytes": "1",
+    "res": "1",
+    "off": "-10",
+    "unit": "DegC"
+   },
+   "$0B06": {
+    "name": "Battery 3 main contactor status",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0B07": {
+    "name": "Battery 3 Voltage",
+    "bytes": "2",
+    "res": "1",
+    "off": "0",
+    "unit": "V"
+   },
+   "$0B08": {
+    "name": "Battery 3 Current",
+    "bytes": "2",
+    "res": "1",
+    "off": "-500",
+    "unit": "Amp"
+   },
+   "$0B09": {
+    "name": "Battery 3 isolation resistance",
+    "bytes": "2",
+    "res": "1",
+    "off": "0",
+    "unit": "kohm"
+   },
+   "$0B0A": {
+    "name": "Battery 3 cell undervolt flag",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0B0B": {
+    "name": "Battery 3 cell overvolt flag",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0B0C": {
+    "name": "Battery 3 emergency power off (EPO)",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0B0D": {
+    "name": "Battery 3 ready flag",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0B0E": {
+    "name": "Battery 3 High Voltage interlock Loop monitoring",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$F18C": {
+    "name": "Supplier ECU Serial Number",
+    "bytes": "16",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$F192": {
+    "name": "Supplier ECU part number",
+    "bytes": "16",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$F197": {
+    "name": "Variant Dataset Identification Number (Variant Coding)",
+    "bytes": "15",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$0203": {
+    "name": "Battery1 coolant in temperature - to be implemented in BMS",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "DegC"
+   },
+   "$0204": {
+    "name": "Battery2 coolant in temperature - to be implemented in BMS",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "DegC"
+   },
+   "$0205": {
+    "name": "Battery1 coolant out temperature - to be implemented in BMS",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "DegC"
+   },
+   "$0206": {
+    "name": "Battery2 coolant out temperature -to be implemented in BMS",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "DegC"
+   },
+   "$0207": {
+    "name": "Battery1 Cell Temperature Max",
+    "bytes": "1",
+    "res": "1",
+    "off": "-10",
+    "unit": "DegC"
+   },
+   "$0208": {
+    "name": "Battery1 Cell Temperature Min",
+    "bytes": "1",
+    "res": "1",
+    "off": "-10",
+    "unit": "DegC"
+   },
+   "$0209": {
+    "name": "Battery2 Cell Temperature Max",
+    "bytes": "1",
+    "res": "1",
+    "off": "-10",
+    "unit": "DegC"
+   },
+   "$020A": {
+    "name": "Battery2 Cell Temperature Min",
+    "bytes": "1",
+    "res": "1",
+    "off": "-10",
+    "unit": "DegC"
+   },
+   "$020B": {
+    "name": "Battery 1 Balancing flag",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$020C": {
+    "name": "Battery 1 main contactor status",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$020D": {
+    "name": "Battery 1 Voltage",
+    "bytes": "2",
+    "res": "1",
+    "off": "0",
+    "unit": "V"
+   },
+   "$020E": {
+    "name": "Battery 1 Current",
+    "bytes": "2",
+    "res": "1",
+    "off": "-500",
+    "unit": "Amp"
+   },
+   "$020F": {
+    "name": "Battery 1 isolation resistance",
+    "bytes": "2",
+    "res": "1",
+    "off": "0",
+    "unit": "kohm"
+   },
+   "$0300": {
+    "name": "Battery 1 cell undervolt flag",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0301": {
+    "name": "Battery 1 cell overvolt flag",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0302": {
+    "name": "Battery 1and 2 enable",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0303": {
+    "name": "Battery 1 emergency power off (EPO)",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0304": {
+    "name": "Battery 1 ready flag",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0305": {
+    "name": "Battery 1 High Voltage interlock Loop monitoring",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0306": {
+    "name": "Battery 1 alarm status",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0307": {
+    "name": "Battery 1 and 2 contactor close command",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0308": {
+    "name": "Battery 2 Balancing flag",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0309": {
+    "name": "Battery 2 main contactor status",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$030A": {
+    "name": "Battery 2 Voltage",
+    "bytes": "2",
+    "res": "1",
+    "off": "0",
+    "unit": "V"
+   },
+   "$030B": {
+    "name": "Battery 2 Current",
+    "bytes": "2",
+    "res": "1",
+    "off": "-500",
+    "unit": "amp"
+   },
+   "$030C": {
+    "name": "Battery 2 isolation resistance",
+    "bytes": "2",
+    "res": "1",
+    "off": "0",
+    "unit": "kohm"
+   },
+   "$030D": {
+    "name": "Battery 2 cell undervolt flag",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$030E": {
+    "name": "Battery 2 cell overvolt flag",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$030F": {
+    "name": "Battery 2 emergency power off (EPO)",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0400": {
+    "name": "Battery 2 ready flag",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0401": {
+    "name": "Battery 2 HVIL monitoring",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0402": {
+    "name": "Battery 2 alarm status",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0403": {
+    "name": "Lenze current DC",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "amp"
+   },
+   "$0404": {
+    "name": "Lenze Voltage LV",
+    "bytes": "2",
+    "res": "0.1",
+    "off": "0",
+    "unit": "V"
+   },
+   "$0405": {
+    "name": "Lenze Voltage HV",
+    "bytes": "2",
+    "res": "1",
+    "off": "0",
+    "unit": "V"
+   },
+   "$0406": {
+    "name": "Lenze Power",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "watt"
+   },
+   "$0407": {
+    "name": "Lenze Torque",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "Nm"
+   },
+   "$0408": {
+    "name": "Lenze RPM / velocity",
+    "bytes": "2",
+    "res": "1",
+    "off": "1",
+    "unit": "rpm"
+   },
+   "$0409": {
+    "name": "Lenze Temperature",
+    "bytes": "1",
+    "res": "1",
+    "off": "-10",
+    "unit": "DegC"
+   },
+   "$040A": {
+    "name": "Lenze System precharged",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$040B": {
+    "name": "Lenze System Actual deviceTemperature",
+    "bytes": "1",
+    "res": "1",
+    "off": "-10",
+    "unit": "DegC"
+   },
+   "$040C": {
+    "name": "Lenze System Actual dcbuspower",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "watt"
+   },
+   "$040D": {
+    "name": "Lenze System Actual DCbusvoltage",
+    "bytes": "2",
+    "res": "1",
+    "off": "0",
+    "unit": "V"
+   },
+   "$040E": {
+    "name": "Lenze System errorcode",
+    "bytes": "2",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$040F": {
+    "name": "Lenze System clamp15 status",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0500": {
+    "name": "Lenze System devicenumber",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0501": {
+    "name": "Lenze System errorlamp",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0502": {
+    "name": "Lenze System devicestate",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0503": {
+    "name": "Lenze Inverter Actual motortemperature",
+    "bytes": "1",
+    "res": "1",
+    "off": "-10",
+    "unit": "DegC"
+   },
+   "$0504": {
+    "name": "Lenze Inverter Actual power",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "watt"
+   },
+   "$0505": {
+    "name": "Lenze Inverter Actual torque",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "Nm"
+   },
+   "$0506": {
+    "name": "Lenze Inverter Actual speed",
+    "bytes": "2",
+    "res": "1",
+    "off": "0",
+    "unit": "rpm"
+   },
+   "$0507": {
+    "name": "Lenze Inverter Actual errorstatus",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0508": {
+    "name": "Lenze Inverter Actual inverterready",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0509": {
+    "name": "Lenze Inverter Actual inverterstatus",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$050A": {
+    "name": "Lenze Dcdc Actual temperature",
+    "bytes": "1",
+    "res": "1",
+    "off": "-10",
+    "unit": "DegC"
+   },
+   "$050B": {
+    "name": "Lenze Dcdc Actual power",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "watt"
+   },
+   "$050C": {
+    "name": "Lenze Dcdc Actual current",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "amp"
+   },
+   "$050D": {
+    "name": "Lenze Dcdc Actual voltage",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "V"
+   },
+   "$050E": {
+    "name": "Lenze Dcdc Actual errorstatus",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$050F": {
+    "name": "Lenze Dcdc Actual inverterready",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0600": {
+    "name": "Lenze Dcdc Actual inverterstatus",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0601": {
+    "name": "Lenze System setpoint DcLinkVoltage",
+    "bytes": "2",
+    "res": "1",
+    "off": "0",
+    "unit": "V"
+   },
+   "$0602": {
+    "name": "Lenze System Clamp15 CAN",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0603": {
+    "name": "Lenze System SystemEnable",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0604": {
+    "name": "Lenze Inverter setpoint Torque 1",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "Nm"
+   },
+   "$0605": {
+    "name": "Lenze Inverter setpoint Speed1",
+    "bytes": "2",
+    "res": "1",
+    "off": "0",
+    "unit": "rpm"
+   },
+   "$0606": {
+    "name": "Lenze Inverter setpoint DcLinkTolerance",
+    "bytes": "2",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0607": {
+    "name": "Lenze Inverter ctrlDCU1",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0608": {
+    "name": "Lenze Dcdc setpoint MaxCurrent1",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "Amp"
+   },
+   "$0609": {
+    "name": "Lenze Dcdc setpoint Voltage1",
+    "bytes": "2",
+    "res": "0.1",
+    "off": "0",
+    "unit": "V"
+   },
+   "$060A": {
+    "name": "Lenze Dcdc setpoint DcLinkTolerance",
+    "bytes": "2",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$060B": {
+    "name": "Lenze Dcdc ctrlPSU1",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$060C": {
+    "name": "Lenze System discharge enable",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$060D": {
+    "name": "Lenze System setpoint DcLinkVoltage",
+    "bytes": "2",
+    "res": "1",
+    "off": "0",
+    "unit": "V"
+   },
+   "$060E": {
+    "name": "Lenze AC output voltage- not implemented in 1939, to be checked on UDS",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "V"
+   },
+   "$060F": {
+    "name": "Lenze AC output frequency -  not implemented in 1939, to be checked on UDS",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "Hz"
+   },
+   "$0700": {
+    "name": "Lenze AC motor no of poles -  not implemented in 1939, to be checked on UDS",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$0701": {
+    "name": "Lenze AC motor phase current",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "Amp"
+   },
+   "$0702": {
+    "name": "DC JB +Ve Bus bar temperature",
+    "bytes": "1",
+    "res": "1",
+    "off": "-20",
+    "unit": "degC"
+   },
+   "$0703": {
+    "name": "DC JB -Ve Bus bar temperature",
+    "bytes": "1",
+    "res": "1",
+    "off": "-20",
+    "unit": "DegC"
+   },
+   "$0704": {
+    "name": "MCU - High power voltage",
+    "bytes": "2",
+    "res": "1",
+    "off": "0",
+    "unit": "V"
+   },
+   "$0705": {
+    "name": "MCU High power current",
+    "bytes": "2",
+    "res": "1",
+    "off": "0",
+    "unit": "amp"
+   },
+   "$0706": {
+    "name": "MCU LV voltage",
+    "bytes": "2",
+    "res": "0.1",
+    "off": "0",
+    "unit": "V"
+   },
+   "$0707": {
+    "name": "Motor Torque Estimated",
+    "bytes": "2",
+    "res": "1",
+    "off": "-3000",
+    "unit": "Nm"
+   },
+   "$0708": {
+    "name": "Motor Speed",
+    "bytes": "2",
+    "res": "1",
+    "off": "-3000",
+    "unit": "rpm"
+   },
+   "$0709": {
+    "name": "MCU state",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$070A": {
+    "name": "MCU state requested",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$070B": {
+    "name": "MCU Torque demand",
+    "bytes": "2",
+    "res": "1",
+    "off": "-3000",
+    "unit": "Nm"
+   },
+   "$070C": {
+    "name": "MCU inverter cooling request",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "%"
+   },
+   "$070D": {
+    "name": "MCU motor cooling request",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "%"
+   },
+   "$070E": {
+    "name": "Thermal indicator",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "%"
+   },
+   "$070F": {
+    "name": "Traction Derating",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0800": {
+    "name": "Regeneration Derating",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0801": {
+    "name": "MCU_Emergency stop",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0802": {
+    "name": "Fault Phase to Chassis",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0803": {
+    "name": "Fault interlock battery cable",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0804": {
+    "name": "Fault interlock motor cable",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0805": {
+    "name": "Fault drive cover opened",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0806": {
+    "name": "Fault Phase to Chassis`status",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0807": {
+    "name": "Fault interlock battery status",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0808": {
+    "name": "Fault interlock motor cable status",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0809": {
+    "name": "Fault drive cover opened status",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$080A": {
+    "name": "MCU Auxliary voltage",
+    "bytes": "2",
+    "res": "0.1",
+    "off": "0",
+    "unit": "V"
+   },
+   "$080B": {
+    "name": "Vehicle Speed from ABS as Front axle speed",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "kmph"
+   },
+   "$080C": {
+    "name": "Accelerator pedal position",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "%"
+   },
+   "$080D": {
+    "name": "DNR - position",
+    "bytes": "1"
+   },
+   "$080E": {
+    "name": "Park Brake",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$080F": {
+    "name": "Brake switch",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0900": {
+    "name": "Drive Ready Status",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0901": {
+    "name": "Battery cooling pump speed",
+    "bytes": "2",
+    "res": "1",
+    "off": "0",
+    "unit": "rpm"
+   },
+   "$0902": {
+    "name": "Traction cooling pump speed",
+    "bytes": "2",
+    "res": "1",
+    "off": "0",
+    "unit": "rpm"
+   },
+   "$9003": {
+    "name": "Reserved",
+    "bytes": "0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$0904": {
+    "name": "Rederved",
+    "bytes": "0",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$0905": {
+    "name": "Traction coolant level switch",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0906": {
+    "name": "Battery coolant level switch",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0907": {
+    "name": "Traction Fan Speed command",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "%"
+   },
+   "$0908": {
+    "name": "DC Junction Box Cover Status",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0909": {
+    "name": "Battery Cooling System Fault Alarm Status",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$090A": {
+    "name": "Traction Fan Supply Status",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$090B": {
+    "name": "Ignition Status",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$090C": {
+    "name": "AC compressor ON request Status",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$090D": {
+    "name": "Battery Cooling System Relay Enable Command",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$090E": {
+    "name": "Air Compressor Clutch On Command",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$090F": {
+    "name": "Vehicle Ignition On Command",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$0A00": {
+    "name": "Creep speed",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "kmph"
+   }
+  }
+ },
+ "bcs": {
+  "source_db": "KPD_EV_BCS.INF",
+  "comm": {
+   "TesterAddress": "0x1BDA3AF1",
+   "ECUAddress": "0x1BDAF13A",
+   "DiagnosticMode": "0x03",
+   "ChangedBaudRate": "500000",
+   "AddressingMode": "128",
+   "ECUInitializationType": "70",
+   "GenerateLog": "TRUE",
+   "IsDiagnosticSessionrequired": "TRUE",
+   "KeyByte1": "0x00",
+   "Communication Mode": "1",
+   "InitLine": "2",
+   "InterByteDelay": "3",
+   "SendAlways8Bytes": "TRUE",
+   "CanFrameFormat": "2",
+   "LogFileName": "C:\\\\BCS"
+  },
+  "dids": {
+   "$F187": {
+    "name": "TML Container Part Number ( Assembly No)",
+    "bytes": "12.0"
+   },
+   "$F188": {
+    "name": "TML ECU software number",
+    "bytes": "15.0"
+   },
+   "$F18C": {
+    "name": "Supplier ECU Serial Number",
+    "bytes": "8.0"
+   },
+   "$F190": {
+    "name": "Vehicle Identification Number (VIN)",
+    "bytes": "17.0"
+   },
+   "$F191": {
+    "name": "TML ECU hardware number",
+    "bytes": "15.0"
+   },
+   "$F192": {
+    "name": "Supplier ECU part number",
+    "bytes": "8.0"
+   },
+   "$F197": {
+    "name": "Variant Dataset Identification Number (Variant Coding)",
+    "bytes": "5.0"
+   },
+   "$F198": {
+    "name": "Programming Shop Code",
+    "bytes": "5.0"
+   },
+   "$F199": {
+    "name": "Date of Last Programming in the format [DD-MM-YYYY]",
+    "bytes": "4.0"
+   },
+   "$F19C": {
+    "name": "TML Software calibration identification Number (SCIN)",
+    "bytes": "16.0"
+   },
+   "$F1A0": {
+    "name": "Vehicle configuration Number VCN",
+    "bytes": "15.0"
+   },
+   "$F1A1": {
+    "name": "Parameter Part Number PPN",
+    "bytes": "17.0"
+   },
+   "$F1A2": {
+    "name": "Reprogramming counter",
+    "bytes": "2.0"
+   },
+   "$FD00": {
+    "name": "Water inlet temperature",
+    "bytes": "1.0"
+   },
+   "$FD01": {
+    "name": "Water outlet temperature",
+    "bytes": "1.0"
+   },
+   "$FD02": {
+    "name": "Pressure suction side",
+    "bytes": "1.0"
+   },
+   "$FD03": {
+    "name": "Pressure discharge side",
+    "bytes": "1.0"
+   },
+   "$FD04": {
+    "name": "Coolant availability status",
+    "bytes": "1.0"
+   },
+   "$FD05": {
+    "name": "LV battery voltage",
+    "bytes": "1.0"
+   },
+   "$FD06": {
+    "name": "HV battery voltage",
+    "bytes": "1.0"
+   },
+   "$FD07": {
+    "name": "HV relay status",
+    "bytes": "1.0"
+   },
+   "$FD08": {
+    "name": "Cooling fan status",
+    "bytes": "1.0"
+   },
+   "$FD09": {
+    "name": "Coolant pump % duty cycle",
+    "bytes": "1.0"
+   },
+   "$FD0A": {
+    "name": "BMS communication status",
+    "bytes": "1.0"
+   },
+   "$FD0B": {
+    "name": "Compressor communication status",
+    "bytes": "1.0"
+   },
+   "$FD0C": {
+    "name": "Compressor status",
+    "bytes": "1.0"
+   },
+   "$FD0D": {
+    "name": "Compressor speed",
+    "bytes": "2.0"
+   },
+   "$FD0E": {
+    "name": "Compressor current",
+    "bytes": "1.0"
+   },
+   "$FD0F": {
+    "name": "Compressor power",
+    "bytes": "2.0"
+   },
+   "$FD80": {
+    "name": "Active software component",
+    "bytes": "1.0"
+   },
+   "$FD81": {
+    "name": "Bootloader software version",
+    "bytes": "3.0"
+   },
+   "$FD82": {
+    "name": "Application software version",
+    "bytes": "3.0"
+   },
+   "$FD83": {
+    "name": "Platform software version",
+    "bytes": "3.0"
+   },
+   "$FE04": {
+    "name": "Set compressor speed",
+    "bytes": "2.0"
+   },
+   "$FE05": {
+    "name": "Set coolant pump duty % duty cycle",
+    "bytes": "1.0"
+   },
+   "$FE00": {
+    "name": "Set cooling fan control",
+    "bytes": "1.0"
+   },
+   "$FE01": {
+    "name": "Set HV relay control",
+    "bytes": "1.0"
+   },
+   "$FE02": {
+    "name": "Set solenoid control",
+    "bytes": "1.0"
+   },
+   "$FE03": {
+    "name": "Set compressor control",
+    "bytes": "1.0"
+   },
+   "$F186": {
+    "name": "Active Diagnostic Session",
+    "bytes": "1.0"
+   }
+  }
+ },
+ "obc_dcdc_minda": {
+  "source_db": "DCDC_OBC_Minda.mdb",
+  "comm": {
+   "TesterAddress": "0x1BDA8FF1",
+   "ECUAddress": "0x1BDAF18F",
+   "DiagnosticMode": "0x03",
+   "ChangedBaudRate": "500000",
+   "AddressingMode": "128",
+   "ECUInitializationType": "70",
+   "GenerateLog": "TRUE",
+   "IsDiagnosticSessionrequired": "TRUE",
+   "KeyByte1": "0x00",
+   "Communication Mode": "1",
+   "InitLine": "2",
+   "InterByteDelay": "3",
+   "SendAlways8Bytes": "TRUE",
+   "CanFrameFormat": "2",
+   "LogFileName": "C:\\\\DCDC_OBC"
+  },
+  "dids": {
+   "$F18C": {
+    "name": "Supplier ECU Serial Number",
+    "bytes": "4",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$F192": {
+    "name": "Supplier ECU part number",
+    "bytes": "4",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$F191": {
+    "name": "TML ECU hardware number",
+    "bytes": "15",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$F187": {
+    "name": "TML Container Part Number ( Assembly No)",
+    "bytes": "15",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$F19C": {
+    "name": "TML Software calibration identification Number",
+    "bytes": "16",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$F188": {
+    "name": "TML ECU software number",
+    "bytes": "15",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$F198": {
+    "name": "Programming Shop Code",
+    "bytes": "2",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$F199": {
+    "name": "Date of Last Programming in the format [ DD - MM - YYYY ]",
+    "bytes": "4",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$F190": {
+    "name": "Vehicle Identification Number",
+    "bytes": "17",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$F197": {
+    "name": "Variant Dataset Identification Number (Variant Coding)",
+    "bytes": "5",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$F1A0": {
+    "name": "Vehicle configuration Number",
+    "bytes": "15",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$F1A1": {
+    "name": "Parameter Part Number",
+    "bytes": "17",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$F1A2": {
+    "name": "Reprogramming Counter",
+    "bytes": "5",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$F1A3": {
+    "name": "Unique ID for Flashing / OTA",
+    "bytes": "20",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$F1A4": {
+    "name": "ECU ID @@",
+    "bytes": "20",
+    "subparams": [
+     {
+      "sub": "Reserved for Future Use",
+      "pos": "4",
+      "len": "20",
+      "res": "1",
+      "off": "0",
+      "unit": "-"
+     },
+     {
+      "sub": "ECU ID @@",
+      "pos": "4",
+      "len": "2",
+      "res": "1",
+      "off": "0",
+      "unit": "-"
+     }
+    ]
+   },
+   "$F1A6": {
+    "name": "VCID - Vehicle Configuration ID",
+    "bytes": "20",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$300D": {
+    "name": "BMS_Batt_Voltage",
+    "bytes": "2",
+    "res": "0.1",
+    "off": "0",
+    "unit": "V"
+   },
+   "$300E": {
+    "name": "BMS_Batt_Current",
+    "bytes": "2",
+    "res": "0.1",
+    "off": "-600",
+    "unit": "A"
+   },
+   "$300F": {
+    "name": "BMS_SOC",
+    "bytes": "2",
+    "res": "0.1",
+    "off": "0",
+    "unit": "%"
+   },
+   "$3010": {
+    "name": "BMS_SOH",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "%"
+   },
+   "$3011": {
+    "name": "BMS_MaxCell_Temp",
+    "bytes": "1",
+    "res": "1",
+    "off": "-50",
+    "unit": "Deg C"
+   },
+   "$3012": {
+    "name": "BMS_MinCell_Temp",
+    "bytes": "1",
+    "res": "1",
+    "off": "-50",
+    "unit": "Deg C"
+   },
+   "$3013": {
+    "name": "BMS_Fault_Rank",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "None"
+   },
+   "$3014": {
+    "name": "BMS_Inlet_Temp1",
+    "bytes": "1",
+    "res": "1",
+    "off": "-50",
+    "unit": "Deg C"
+   },
+   "$3015": {
+    "name": "BMS_Outlet_Temp1",
+    "bytes": "1",
+    "res": "1",
+    "off": "-50",
+    "unit": "Deg C"
+   },
+   "$3016": {
+    "name": "BMS_Insulation_Value",
+    "bytes": "2",
+    "res": "1",
+    "off": "0",
+    "unit": "Kohm"
+   },
+   "$3017": {
+    "name": "BMS_MaxCellVolt",
+    "bytes": "2",
+    "res": "0.01",
+    "off": "0",
+    "unit": "V"
+   },
+   "$3018": {
+    "name": "BMS_MinCell_Volt",
+    "bytes": "2",
+    "res": "0.01",
+    "off": "0",
+    "unit": "V"
+   },
+   "$3019": {
+    "name": "BMS_Max_Volt_No",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "N/A"
+   },
+   "$301A": {
+    "name": "BMS_Min_Volt_No",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "N/A"
+   },
+   "$301D": {
+    "name": "BMS_MaxAllowPeakDisChrgCurr",
+    "bytes": "2",
+    "res": "0.1",
+    "off": "0",
+    "unit": "A"
+   },
+   "$301F": {
+    "name": "BMS_MaxAllowContinusChrgCurr",
+    "bytes": "2",
+    "res": "0.1",
+    "off": "0",
+    "unit": "A"
+   },
+   "$3020": {
+    "name": "BMS_MaxAllowContinusDisChrgCurr",
+    "bytes": "2",
+    "res": "0.1",
+    "off": "0",
+    "unit": "A"
+   },
+   "$3023": {
+    "name": "BMS_MaxAllowPeakChrgCurr",
+    "bytes": "2",
+    "res": "0.1",
+    "off": "0",
+    "unit": "A"
+   },
+   "$3024": {
+    "name": "LV_Power_Supply",
+    "bytes": "2",
+    "res": "0.01",
+    "off": "0",
+    "unit": "V"
+   },
+   "$303C": {
+    "name": "BMS_Max_Temp_No",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$303D": {
+    "name": "BMS_Min_Temp_No",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$3054": {
+    "name": "BMS_Average_Temp",
+    "bytes": "1",
+    "res": "1",
+    "off": "-50",
+    "unit": "Deg C"
+   },
+   "$3056": {
+    "name": "PCB_Temp_Max_Value",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "Deg C"
+   },
+   "$3058": {
+    "name": "Cell_SOC_Min",
+    "bytes": "2",
+    "res": "0.1",
+    "off": "0",
+    "unit": "%"
+   },
+   "$3059": {
+    "name": "Cell_SOC_Max",
+    "bytes": "2",
+    "res": "0.1",
+    "off": "0",
+    "unit": "%"
+   },
+   "$305B": {
+    "name": "BMS_CellVol_Difference",
+    "bytes": "2",
+    "res": "1",
+    "off": "0",
+    "unit": "mV"
+   },
+   "$305C": {
+    "name": "BMS_AllowedMaxContinusOutPower",
+    "bytes": "2",
+    "res": "0.1",
+    "off": "0",
+    "unit": "KW"
+   },
+   "$305D": {
+    "name": "BMS_AllowedMaxPeakOutPower",
+    "bytes": "2",
+    "res": "0.1",
+    "off": "0",
+    "unit": "KW"
+   },
+   "$305E": {
+    "name": "BMS_AllowedMaxPeakFBPower",
+    "bytes": "2",
+    "res": "0.1",
+    "off": "0",
+    "unit": "KW"
+   },
+   "$305F": {
+    "name": "BMS_AllowedMaxContinusFBPower",
+    "bytes": "2",
+    "res": "0.1",
+    "off": "0",
+    "unit": "KW"
+   },
+   "$3060": {
+    "name": "BMS_Battery_V2-",
+    "bytes": "2",
+    "res": "0.01",
+    "off": "0",
+    "unit": "V"
+   },
+   "$3061": {
+    "name": "BMS_Battery_V3+",
+    "bytes": "2",
+    "res": "0.1",
+    "off": "0",
+    "unit": "V"
+   },
+   "$309C": {
+    "name": "BMS_Acc_kWh_Consumed",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "KWh"
+   },
+   "$3004": {
+    "name": "BMS_HVIL_Status",
+    "bytes": "1"
+   },
+   "$3006": {
+    "name": "BMS_HVPosRelay_status",
+    "bytes": "1"
+   },
+   "$3007": {
+    "name": "BMS_HVNegRelay_status",
+    "bytes": "1"
+   },
+   "$3008": {
+    "name": "BMS_HVPreChargeRelay_status",
+    "bytes": "1"
+   },
+   "$3009": {
+    "name": "VCU_BMS_Enable",
+    "bytes": "1"
+   },
+   "$300A": {
+    "name": "VCU_BMS_EPO",
+    "bytes": "1"
+   },
+   "$300B": {
+    "name": "VCU_BMS_MainC_Close",
+    "bytes": "1"
+   },
+   "$300C": {
+    "name": "VCU_BMS_Insulation_Enable",
+    "bytes": "1"
+   },
+   "$3040": {
+    "name": "BMS_Charging_done_Flg",
+    "bytes": "1"
+   },
+   "$3042": {
+    "name": "BMS_SOCCalActFlag",
+    "bytes": "1"
+   },
+   "$3049": {
+    "name": "VCU_SlowCharging_Flag",
+    "bytes": "1"
+   },
+   "$304B": {
+    "name": "BMS_PackReady",
+    "bytes": "1"
+   },
+   "$304C": {
+    "name": "BMS_KeyOn",
+    "bytes": "1"
+   },
+   "$3050": {
+    "name": "BMS_DerateFlag",
+    "bytes": "1"
+   },
+   "$3051": {
+    "name": "BMS_CellBal_Status",
+    "bytes": "1"
+   },
+   "$3052": {
+    "name": "BMS_SOC_NoFullChargFlag",
+    "bytes": "1"
+   },
+   "$3053": {
+    "name": "VCU_HVILDetect",
+    "bytes": "1"
+   },
+   "$3055": {
+    "name": "BMS_Insulation_Status",
+    "bytes": "1"
+   },
+   "$3057": {
+    "name": "Mandatory_Slow_Full_Charging",
+    "bytes": "1"
+   },
+   "$305A": {
+    "name": "AerosolCom_flt",
+    "bytes": "1"
+   },
+   "$303A": {
+    "name": "E2P_Data_Transfer_Status",
+    "bytes": "1"
+   },
+   "$304F": {
+    "name": "BMS_OperMod",
+    "bytes": "1"
+   },
+   "$3000": {
+    "name": "BMS_SoftwareVersion",
+    "bytes": "4"
+   },
+   "$3002": {
+    "name": "BMS_HardwareVersion",
+    "bytes": "4"
+   },
+   "$3063": {
+    "name": "BMS_Supplier_Inner_Software_Number",
+    "bytes": "4"
+   },
+   "$30D2": {
+    "name": "BMS_ThermalRunawayReason",
+    "bytes": "3",
+    "res": "1",
+    "off": "0",
+    "unit": "-"
+   },
+   "$308B": {
+    "name": "AerosolConcentration",
+    "bytes": "2",
+    "res": "1",
+    "off": "0",
+    "unit": "ug"
+   },
+   "$3021": {
+    "name": "BMS_KWh_Remain_log",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "kwh"
+   },
+   "$3031": {
+    "name": "BMS_Seconds_log",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "sec"
+   },
+   "$3032": {
+    "name": "BMS_Minutes_log",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "min"
+   },
+   "$3033": {
+    "name": "BMS_Hours_log",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "hour"
+   },
+   "$3034": {
+    "name": "BMS_Month_log",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "month"
+   },
+   "$3035": {
+    "name": "BMS_Day_log",
+    "bytes": "1",
+    "res": "1",
+    "off": "0",
+    "unit": "day"
+   },
+   "$3036": {
+    "name": "BMS_Year_log",
+    "bytes": "1",
+    "res": "1",
+    "off": "1985",
+    "unit": "year"
+   },
+   "$309F": {
+    "name": "BMS_Crash_Duty_Cycle",
+    "bytes": "2",
+    "res": "0.1",
+    "off": "0",
+    "unit": "%"
+   },
+   "$30D0": {
+    "name": "BMS_Crash_frequency",
+    "bytes": "2",
+    "res": "0.1",
+    "off": "0",
+    "unit": "Hz"
+   },
+   "$309E": {
+    "name": "BMS_HVIL_Duty_Cycle",
+    "bytes": "2",
+    "res": "0.1",
+    "off": "0",
+    "unit": "%"
+   },
+   "$30D1": {
+    "name": "BMS_HVIL_frequency",
+    "bytes": "2",
+    "res": "0.1",
+    "off": "0",
+    "unit": "Hz"
+   }
+  }
+ }
+}
