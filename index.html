@@ -134,7 +134,7 @@
     <div style="display: flex; gap: 8px; align-items: center;">
       <select id="selProfile" style="flex: 1;"></select>
     </div>
-    <div class="num" style="font-size: 10px; color: var(--mut); text-align: center;">Chrome / Edge on Android · BLE (v4+) ELM327 adapter</div>
+    <div class="num" style="font-size: 10px; color: var(--mut); text-align: center;" id="connHint">Chrome / Edge on Android · BLE (v4+) ELM327 adapter</div>
   </div>
 </div>
 
@@ -493,18 +493,39 @@ class Elm {
     await this.attach(dev);
   }
 
+  /* Reconnect to the remembered adapter with no chooser.
+     Chrome requires a watchAdvertisements() warm-up before gatt.connect()
+     works on a device that came from getDevices(). */
   async reconnectSilent() {
-    if (!navigator.bluetooth.getDevices) return false;
+    if (!navigator.bluetooth || !navigator.bluetooth.getDevices) return { ok: false, reason: "browser has no getDevices() — persistent permissions unsupported" };
     const savedId = store.get("evm_device");
-    if (!savedId) return false;
-    const devs = await navigator.bluetooth.getDevices();
-    const dev = devs.find(d => d.id === savedId);
-    if (!dev) return false;
-    try { await this.attach(dev); return true; } catch (e) { return false; }
+    if (!savedId) return { ok: false, reason: "no adapter saved yet" };
+    let devs = [];
+    try { devs = await navigator.bluetooth.getDevices(); } catch (e) { return { ok: false, reason: "getDevices failed: " + e.message }; }
+    const dev = devs.find(d => d.id === savedId) || (devs.length === 1 ? devs[0] : null);
+    if (!dev) return { ok: false, reason: "permission not persisted (private tab, or permission cleared)" };
+    // warm-up: wait until the adapter is heard advertising (max 6 s)
+    if (dev.watchAdvertisements) {
+      try {
+        const ctrl = new AbortController();
+        const seen = new Promise(res => {
+          dev.addEventListener("advertisementreceived", () => res(true), { once: true });
+          setTimeout(() => res(false), 6000);
+        });
+        await dev.watchAdvertisements({ signal: ctrl.signal });
+        await seen;
+        ctrl.abort();
+      } catch (e) { /* warm-up is best-effort */ }
+    }
+    try { await this.attach(dev); return { ok: true }; }
+    catch (e) { return { ok: false, reason: "adapter not reachable: " + e.message }; }
   }
 
   async attach(dev) {
-    const gatt = await dev.gatt.connect();
+    const gatt = await Promise.race([
+      dev.gatt.connect(),
+      new Promise((_, rej) => setTimeout(() => { try { dev.gatt.disconnect(); } catch (e) {} rej(new Error("connect timeout")); }, 10000)),
+    ]);
     dev.ongattserverdisconnected = () => { this.connected = false; if (this.onDisconnect) this.onDisconnect(); };
     let pair = null;
     for (const c of BLE_UUIDS) {
@@ -533,6 +554,7 @@ class Elm {
     });
     this.dev = dev; this.wr = pair.wr; this.connected = true;
     store.set("evm_device", dev.id);
+    if (dev.name) store.set("evm_device_name", dev.name);
   }
 
   send(cmd, timeout = 2200) {
@@ -614,10 +636,12 @@ function step(id, state, text) {
 async function connectFlow(silent) {
   try {
     if (!navigator.bluetooth) throw new Error("No Web Bluetooth in this browser. Use Chrome or Edge on Android.");
-    step("stAdapter", "on");
-    if (silent) {
-      if (!await elm.reconnectSilent()) return false;
-    } else {
+    step("stAdapter", "on", "Reconnecting to saved adapter…");
+    const r = await elm.reconnectSilent();
+    if (!r.ok) {
+      logLine("silent reconnect: " + r.reason);
+      if (silent) { step("stAdapter", "fail", "Adapter — tap connect (" + r.reason + ")"); return false; }
+      step("stAdapter", "on", "Pick your adapter in the chooser…");
       await elm.pick();
     }
     elm.onDisconnect = onAdapterLost;
@@ -707,7 +731,7 @@ function scheduleReconnect() {
     if (document.visibilityState !== "visible") return;
     if (++tries > 75) { clearInterval(reconTimer); reconTimer = null; $("connTxt").textContent = "Lost"; return; }
     try {
-      if (await elm.reconnectSilent()) {
+      if ((await elm.reconnectSilent()).ok) {
         clearInterval(reconTimer); reconTimer = null;
         await quickInit();
         logLine("reconnected · session restored", "ok");
@@ -1140,6 +1164,8 @@ $("termIn").addEventListener("keydown", e => { if (e.key === "Enter") $("btnSend
     $("compatWarn").style.display = "block";
     $("compatWarn").textContent = "⚠ Web Bluetooth is not available here. Use Chrome or Edge on Android (or desktop), over HTTPS. Classic-Bluetooth-only ELM327 adapters won't work — you need a BLE (v4+) adapter such as vGate iCar Pro BLE4 or vLinker.";
   } else {
+    const savedName = store.get("evm_device_name");
+    if (savedName) $("connHint").textContent = `Saved adapter: ${savedName} — reconnects without the chooser`;
     connectFlow(true);   // silent reconnect attempt
   }
   if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
