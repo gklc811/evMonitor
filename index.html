@@ -436,7 +436,7 @@ const FAMILIES = {
   },
 };
 const FAST_KEYS = ["soc", "packV", "packI", "maxV", "minV", "maxN", "minN", "delta"];
-const SLOW_KEYS = ["soh", "maxT", "minT", "avgT", "maxTN", "minTN", "bal", "lv"];
+const SLOW_KEYS = ["soh", "maxT", "minT", "avgT", "maxTN", "minTN", "bal"];
 
 /* ---------- vehicle profiles ---------- */
 const PROFILES = [
@@ -547,9 +547,20 @@ class Elm {
     await pair.nt.startNotifications();
     pair.nt.addEventListener("characteristicvaluechanged", ev => {
       this.buf += new TextDecoder().decode(ev.target.value);
-      if (this.buf.includes(">") && this.waiter) {
+      // parse complete '>'-terminated segments; drop stale ones so a late
+      // response from a timed-out command can never resolve the next command
+      let i;
+      while ((i = this.buf.indexOf(">")) >= 0) {
+        const seg = this.buf.slice(0, i + 1);
+        this.buf = this.buf.slice(i + 1);
+        if (!this.waiter) continue;                       // no one waiting: stale, drop
+        if (this.waiter.expect) {
+          const flat = seg.toUpperCase().replace(/[^0-9A-F]/g, "");
+          const isErr = /NO DATA|ERROR|UNABLE|STOPPED|\?/i.test(seg) || flat.includes("7F");
+          if (!flat.includes(this.waiter.expect) && !isErr) continue;   // stale answer to a previous cmd
+        }
         const w = this.waiter; this.waiter = null; clearTimeout(w.t);
-        const r = this.buf; this.buf = ""; w.res(r);
+        w.res(seg);
       }
     });
     this.dev = dev; this.wr = pair.wr; this.connected = true;
@@ -557,12 +568,12 @@ class Elm {
     if (dev.name) store.set("evm_device_name", dev.name);
   }
 
-  send(cmd, timeout = 2200) {
+  send(cmd, timeout = 2200, expect = null) {
     const run = () => new Promise(res => {
       if (!this.connected) return res("");
       this.buf = "";
       const t = setTimeout(() => { if (this.waiter) { this.waiter = null; const r = this.buf; this.buf = ""; res(r); } }, timeout);
-      this.waiter = { res, t };
+      this.waiter = { res, t, expect: expect ? expect.toUpperCase() : null };
       logLine("> " + cmd, "tx");
       const data = new TextEncoder().encode(cmd + "\r");
       const p = this.wr.properties.writeWithoutResponse ? this.wr.writeValueWithoutResponse(data) : this.wr.writeValue(data);
@@ -620,10 +631,23 @@ const store = {
   get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
 };
+const logBuf = [];
 function logLine(msg, cls) {
-  const el = $("log"); if (!el) return;
+  logBuf.push([msg, cls]);
+  if (logBuf.length > 250) logBuf.shift();
+  const ov = $("ovTools");
+  if (!ov || ov.classList.contains("hidden")) return;   // no DOM work while tools are closed
+  const el = $("log");
   const d = document.createElement("div"); if (cls) d.className = cls; d.textContent = msg;
   el.appendChild(d); while (el.childNodes.length > 250) el.removeChild(el.firstChild);
+  el.scrollTop = el.scrollHeight;
+}
+function renderLog() {
+  const el = $("log"); el.innerHTML = "";
+  for (const [msg, cls] of logBuf) {
+    const d = document.createElement("div"); if (cls) d.className = cls; d.textContent = msg;
+    el.appendChild(d);
+  }
   el.scrollTop = el.scrollHeight;
 }
 
@@ -652,7 +676,7 @@ async function connectFlow(silent) {
 
     step("stElm", "on");
     await elm.send("ATZ", 4000);
-    for (const c of ["ATE0", "ATL0", "ATS0", "ATH0", "ATCAF1", "ATSP6", "ATST64"]) await elm.send(c, 800);
+    for (const c of ["ATE0", "ATL0", "ATS0", "ATH0", "ATCAF1", "ATSP6", "ATST32"]) await elm.send(c, 800);
     step("stElm", "ok", "CAN 500k · ELM ready");
 
     /* detect */
@@ -745,7 +769,7 @@ function scheduleReconnect() {
   }, 8000);
 }
 async function quickInit() {
-  for (const c of ["ATE0", "ATL0", "ATS0", "ATH0", "ATCAF1", "ATSP6", "ATST64"]) await elm.send(c, 800);
+  for (const c of ["ATE0", "ATL0", "ATS0", "ATH0", "ATCAF1", "ATSP6", "ATST32"]) await elm.send(c, 800);
   await elm.send("ATSH" + S.profile.hdr, 600);
   await elm.send("ATCRA" + S.profile.rx, 600);
   await elm.send("1003", 1200);
@@ -755,7 +779,7 @@ async function quickInit() {
 async function readKey(key) {
   const e = FAMILIES[S.profile.fam][key];
   if (!e) return null;
-  const bytes = udsPayload(await elm.send("22" + e.did, 1500), "62", e.did);
+  const bytes = udsPayload(await elm.send("22" + e.did, 1000, "62" + e.did), "62", e.did);
   if (!bytes) { S.misses++; return null; }
   S.reads++;
   const v = decodeEntry(e, bytes);
@@ -763,19 +787,60 @@ async function readKey(key) {
   return v;
 }
 
+/* Multi-DID ReadDataByIdentifier: one request, several values.
+   Falls back to per-DID reads the first time the ECU refuses it. */
+S.multiOk = null;
+async function readBatch(keys) {
+  const fam = FAMILIES[S.profile.fam];
+  const entries = keys.map(k => [k, fam[k]]).filter(([, e]) => e);
+  if (!entries.length) return;
+  if (S.multiOk === false || entries.length === 1) {
+    for (const [k] of entries) await readKey(k);
+    return;
+  }
+  const cmd = "22" + entries.map(([, e]) => e.did).join("");
+  const flat = flatHex(await elm.send(cmd, 1400, "62" + entries[0][1].did));
+  let ok = false;
+  const i = flat.indexOf("62");
+  if (i >= 0) {
+    let p = i + 2, guard = 0;
+    while (p + 4 <= flat.length && guard++ < 12) {
+      const did = flat.substr(p, 4);
+      const hit = entries.find(([, e]) => e.did === did);
+      if (!hit) break;
+      const [key, e] = hit;
+      p += 4;
+      if (p + e.bytes * 2 > flat.length) break;
+      const bytes = [];
+      for (let j = 0; j < e.bytes; j++) bytes.push(parseInt(flat.substr(p + j * 2, 2), 16));
+      p += e.bytes * 2;
+      const v = decodeEntry(e, bytes);
+      if (v !== null) { S.t[key] = v; S.reads++; ok = true; }
+    }
+  }
+  if (ok) {
+    if (S.multiOk === null) { S.multiOk = true; logLine("multi-DID reads supported — fast polling on", "ok"); }
+  } else {
+    if (S.multiOk === null) { S.multiOk = false; logLine("multi-DID not supported — using single reads", "info"); }
+    S.misses++;
+    for (const [k] of entries) await readKey(k);
+  }
+}
+
 let slowIdx = 0;
 async function pollLoop() {
   S.polling = true;
   S.session.start = S.session.start || Date.now();
   let lastTP = 0;
+  const BATCHES = [["soc", "packV", "packI"], ["maxV", "minV", "maxN", "minN"], ["delta", "lv"]];
   while (S.polling && elm.connected) {
-    for (const k of FAST_KEYS) { if (!S.polling) break; await readKey(k); }
+    for (const b of BATCHES) { if (!S.polling) break; await readBatch(b); }
     await readKey(SLOW_KEYS[slowIdx++ % SLOW_KEYS.length]);
     if (Date.now() - lastTP > 2500) { await elm.send("3E80", 800); lastTP = Date.now(); }
     tick();
     render();
-    // odometer every 60 s in day view
-    if (!S.night && Date.now() - S.lastOdoAt > 60000) { S.lastOdoAt = Date.now(); await readOdo(); }
+    // odometer every 2 min, day view only, not while charging
+    if (!S.night && !S.charging && Date.now() - S.lastOdoAt > 120000) { S.lastOdoAt = Date.now(); await readOdo(); }
     const wait = S.night && !(S.rec) && (S.t.soc || 0) < 95 ? 1500 : 0;
     if (wait) await new Promise(r => setTimeout(r, wait));
   }
@@ -1111,7 +1176,7 @@ async function scanRange() {
       tbody.appendChild(tr);
     }
   }
-  await elm.send("ATST64", 600);
+  await elm.send("ATST32", 600);
   S.scanning = false; $("btnScan").textContent = "Scan";
   if (wasPolling) pollLoop();
 }
@@ -1148,7 +1213,7 @@ $("btnConnect").onclick = () => connectFlow(false);
 $("btnStart").onclick = startMonitoring;
 $("btnNight").onclick = enterNight;
 $("btnDay").onclick = exitNight;
-$("btnTools").onclick = () => $("ovTools").classList.remove("hidden");
+$("btnTools").onclick = () => { $("ovTools").classList.remove("hidden"); renderLog(); };
 $("btnToolsClose").onclick = () => $("ovTools").classList.add("hidden");
 $("btnReports").onclick = () => { renderReportsList(); $("ovReports").classList.remove("hidden"); };
 $("btnReportsClose").onclick = () => $("ovReports").classList.add("hidden");
