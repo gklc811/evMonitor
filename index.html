@@ -40,6 +40,8 @@
     border-radius: 8px; padding: 10px; font-family: inherit; font-size: 14px; min-height: 44px;
   }
   .hidden { display: none !important; }
+  #viewDash { transition: opacity 1.6s; }
+  body.dim #viewDash { opacity: 0.3; }
 
   /* ---------- connect view ---------- */
   #viewConnect { display: flex; flex-direction: column; gap: 14px; padding-top: 22px; flex: 1; }
@@ -66,12 +68,6 @@
   .meter { height: 8px; border-radius: 4px; background: var(--panel2); position: relative; overflow: hidden; }
   .meter > div { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; background: var(--accent); }
 
-  /* ---------- night ---------- */
-  body.night { background: #000; }
-  body.night .card { background: transparent; border-color: #161b24; }
-  #nightWrap { display: flex; flex-direction: column; gap: 14px; flex: 1; padding-top: 14px; transition: opacity 1.6s; }
-  body.dim #nightWrap { opacity: 0.25; }
-
   /* ---------- overlays ---------- */
   .overlay { position: fixed; inset: 0; background: rgba(4,6,10,0.82); display: flex; align-items: flex-end; justify-content: center; z-index: 40; }
   .sheet { background: var(--panel); border: 1px solid var(--border); border-radius: 18px 18px 0 0; width: 100%; max-width: 430px; max-height: 88vh; overflow-y: auto; padding: 18px 16px 26px; display: flex; flex-direction: column; gap: 12px; }
@@ -89,15 +85,6 @@
     #viewDash { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; align-content: start; }
     #viewDash > .hdr, #viewDash > .foot { grid-column: 1 / -1; }
     #viewDash > .foot { margin-top: 4px; }
-    #nightWrap {
-      display: grid; grid-template-columns: 1.15fr 1fr; gap: 8px 28px; align-content: center;
-      grid-template-areas: "h h" "soc rows" "pw rows" "f f";
-    }
-    #nightWrap > :nth-child(1) { grid-area: h; }
-    #nightWrap > :nth-child(2) { grid-area: soc; padding: 8px 0 0 !important; }
-    #nightWrap > :nth-child(3) { grid-area: pw; }
-    #nightWrap > :nth-child(4) { grid-area: rows; border: none; align-self: center; }
-    #nightWrap > :nth-child(5) { grid-area: f; margin-top: 8px !important; }
   }
 </style>
 </head>
@@ -148,7 +135,7 @@
     <div style="display: flex; align-items: center; gap: 8px;">
       <div class="pill"><span class="dot" id="connDot"></span><span class="lbl" style="font-size: 11px; font-weight: 600; color: var(--sec);" id="connTxt">—</span></div>
       <button class="iconbtn" id="btnReports" title="Reports"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="#93a1b8" stroke-width="1.4"><path d="M3 2h10v12H3z M5.5 5.5h5 M5.5 8h5 M5.5 10.5h3"></path></svg></button>
-      <button class="iconbtn" id="btnNight" title="Night view"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="#93a1b8" stroke-width="1.4"><path d="M13.5 9.5A6 6 0 0 1 6.5 2.5a6 6 0 1 0 7 7z"></path></svg></button>
+      <div class="pill" title="wake lock"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#f5b73d" stroke-width="1.4"><circle cx="8" cy="8" r="3"></circle><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M12.6 3.4l-1.4 1.4M4.8 11.2l-1.4 1.4"></path></svg><span class="lbl" style="font-size: 10px; font-weight: 600; color: var(--sec);" id="wakeState">Screen —</span></div>
     </div>
   </div>
 
@@ -191,6 +178,7 @@
       <div class="lbl tile-lbl">Pack</div>
       <span class="num" style="font-size: 21px; font-weight: 600;" id="vPackV">—</span>
       <span class="num" style="font-size: 10px; color: var(--sec);">V · HV bus</span>
+      <span class="num" style="font-size: 9.5px; color: var(--mut);" id="vPackR"></span>
     </div>
   </div>
 
@@ -209,6 +197,7 @@
           <span class="num" style="font-size: 12px; color: var(--sec);">V</span>
         </div>
         <div class="num" style="font-size: 11px; color: var(--good);" id="vMaxN">cell #—</div>
+        <div class="num" style="font-size: 9.5px; color: var(--mut);" id="vMaxR"></div>
       </div>
       <div style="border-left: 2px solid var(--crit); padding-left: 10px;">
         <div class="lbl tile-lbl">Min cell</div>
@@ -217,13 +206,14 @@
           <span class="num" style="font-size: 12px; color: var(--sec);">V</span>
         </div>
         <div class="num" style="font-size: 11px; color: var(--crit);" id="vMinN">cell #—</div>
+        <div class="num" style="font-size: 9.5px; color: var(--mut);" id="vMinR"></div>
       </div>
     </div>
     <div style="display: flex; flex-direction: column; gap: 6px;">
       <div style="display: flex; justify-content: space-between; align-items: baseline;">
         <span class="lbl tile-lbl">Imbalance ΔV</span>
         <span><span class="num" style="font-size: 15px; font-weight: 600; color: var(--good);" id="vDelta">—</span>
-        <span class="num" style="font-size: 11px; color: var(--sec);"> mV · healthy &lt; 40</span></span>
+        <span class="num" style="font-size: 11px; color: var(--sec);" id="vDeltaR"> mV · healthy &lt; 40</span></span>
       </div>
       <div class="meter" style="height: 6px;"><div id="deltaBar" style="background: var(--good); width: 0%;"></div></div>
     </div>
@@ -255,6 +245,7 @@
       <span class="num" style="font-size: 20px; font-weight: 600;" id="vLv">—</span>
       <span class="num" style="font-size: 11px; color: var(--sec);">V</span>
       <span class="num" style="font-size: 10px; color: var(--mut);" id="vLvSub"></span>
+      <span class="num" style="font-size: 9.5px; color: var(--mut);" id="vLvR"></span>
     </div>
   </div>
 
@@ -268,47 +259,6 @@
   <div class="foot" style="margin-top: auto; display: flex; justify-content: space-between; align-items: center; padding: 2px;">
     <span class="num" style="font-size: 10px; color: var(--mut);" id="pollStats">—</span>
     <button class="ghost" style="min-height: 30px; padding: 4px 10px; font-size: 11px;" id="btnTools">Tools</button>
-  </div>
-</div>
-
-<!-- ================= NIGHT VIEW ================= -->
-<div id="viewNight" class="hidden">
-  <div id="nightWrap">
-    <div style="display: flex; justify-content: space-between; align-items: center;">
-      <div style="display: flex; align-items: center; gap: 8px;">
-        <span class="dot" id="recDot" style="background: var(--warn); box-shadow: 0 0 8px var(--warn);"></span>
-        <span class="lbl" style="font-size: 12px; font-weight: 600; color: #8a97ab;" id="recTxt">Recorder armed · starts at 95%</span>
-      </div>
-      <span class="lbl" style="font-size: 11px; font-weight: 600; color: #55627a;" id="wakeTxt">wake lock —</span>
-    </div>
-
-    <div style="text-align: center; padding: 22px 0 4px;">
-      <div style="display: flex; align-items: baseline; justify-content: center; gap: 6px;">
-        <span class="num" style="font-size: 88px; font-weight: 600; line-height: 1; color: #dfe7f3;" id="nSoc">—</span>
-        <span class="num" style="font-size: 24px; color: #55627a;">%</span>
-      </div>
-      <div class="num" style="font-size: 13px; color: #55627a; margin-top: 9px;" id="nEta">—</div>
-    </div>
-
-    <div class="grid3" style="text-align: center;">
-      <div><div class="num" style="font-size: 23px; font-weight: 600; color: #b7c3d6;" id="nPower">—</div><div class="lbl" style="font-size: 10px; color: #55627a;" id="nPowerSub">kW</div></div>
-      <div><div class="num" style="font-size: 23px; font-weight: 600; color: #b7c3d6;" id="nCurr">—</div><div class="lbl" style="font-size: 10px; color: #55627a;">Amps</div></div>
-      <div><div class="num" style="font-size: 23px; font-weight: 600; color: #b7c3d6;" id="nPackV">—</div><div class="lbl" style="font-size: 10px; color: #55627a;">Pack V</div></div>
-    </div>
-
-    <div style="border-top: 1px solid #161b24; border-bottom: 1px solid #161b24; padding: 13px 2px; display: flex; flex-direction: column; gap: 11px; margin-top: 6px;">
-      <div class="rowline" style="font-size: 12px;"><span class="lbl" style="font-size: 11px; color: #55627a;">ΔV now</span>
-        <span><span class="num" style="font-size: 21px; font-weight: 600; color: var(--good);" id="nDelta">—</span> <span class="num" style="font-size: 11px; color: #55627a;">mV</span></span></div>
-      <div class="rowline"><span class="lbl" style="font-size: 11px; color: #55627a;">ΔV peak (95–100% window)</span><span class="num" id="nPeak" style="color: #55627a;">— below 95%</span></div>
-      <div class="rowline"><span class="lbl" style="font-size: 11px; color: #55627a;">Cells max / min</span><span class="num" id="nCells" style="color: #b7c3d6;">—</span></div>
-      <div class="rowline"><span class="lbl" style="font-size: 11px; color: #55627a;">Temp max / min</span><span class="num" id="nTemps" style="color: #b7c3d6;">—</span></div>
-      <div class="rowline"><span class="lbl" style="font-size: 11px; color: #55627a;">12V battery</span><span class="num" id="nLv" style="color: #b7c3d6;">—</span></div>
-    </div>
-
-    <div style="margin-top: auto; display: flex; flex-direction: column; gap: 10px;">
-      <div style="text-align: center;"><span class="num" style="font-size: 10.5px; color: #3a4356;" id="nFoot">tap to brighten</span></div>
-      <button class="ghost" id="btnDay" style="border-color: #2a3346; color: #8a97ab;">Day view · recording continues</button>
-    </div>
   </div>
 </div>
 
@@ -619,7 +569,7 @@ const S = {
   profile: null, view: "connect", night: false, polling: false, scanning: false,
   t: {},                                   // live telemetry
   reads: 0, misses: 0,
-  session: { start: 0, eOut: 0, eIn: 0, lastT: 0, lastP: 0, odoStart: null, odoNow: null },
+  session: { start: 0, eOut: 0, eIn: 0, lastT: 0, lastP: 0, odoStart: null, odoNow: null, range: {} },
   charging: false, chargeStreak: 0, idleStreak: 0,
   rec: null,                               // active recording window
   socHist: [],                             // [t, soc] for ETA
@@ -839,10 +789,8 @@ async function pollLoop() {
     if (Date.now() - lastTP > 2500) { await elm.send("3E80", 800); lastTP = Date.now(); }
     tick();
     render();
-    // odometer every 2 min, day view only, not while charging
-    if (!S.night && !S.charging && Date.now() - S.lastOdoAt > 120000) { S.lastOdoAt = Date.now(); await readOdo(); }
-    const wait = S.night && !(S.rec) && (S.t.soc || 0) < 95 ? 1500 : 0;
-    if (wait) await new Promise(r => setTimeout(r, wait));
+    // odometer every 2 min, not while charging
+    if (!S.charging && Date.now() - S.lastOdoAt > 120000) { S.lastOdoAt = Date.now(); await readOdo(); }
   }
 }
 
@@ -878,8 +826,18 @@ function tick() {
   /* charging state machine */
   if (t.packI != null) {
     if (t.packI < -0.5) { S.chargeStreak++; S.idleStreak = 0; } else { S.idleStreak++; S.chargeStreak = 0; }
-    if (!S.charging && S.chargeStreak >= 3) { S.charging = true; if (!S.night) enterNight(); }
+    if (!S.charging && S.chargeStreak >= 3) S.charging = true;
     if (S.charging && S.idleStreak >= 25) { S.charging = false; finalizeRec(); }
+  }
+  /* session lo/hi ranges for the voltage readouts */
+  const dNow = liveDelta();
+  const rngSrc = { packV: t.packV, maxV: t.maxV, minV: t.minV, delta: dNow, lv: t.lv };
+  for (const k in rngSrc) {
+    const v = rngSrc[k];
+    if (v == null) continue;
+    const r = S.session.range[k] || (S.session.range[k] = { lo: v, hi: v });
+    if (v < r.lo) r.lo = v;
+    if (v > r.hi) r.hi = v;
   }
   /* ETA history */
   if (t.soc != null) {
@@ -946,34 +904,6 @@ function lvStatus(v) {
 }
 function render() {
   const t = S.t, d = liveDelta();
-  if (S.night) {
-    $("nSoc").textContent = fmt(t.soc, 1);
-    const p = (t.packV != null && t.packI != null) ? t.packV * t.packI / 1000 : null;
-    $("nPower").textContent = p == null ? "—" : Math.abs(p).toFixed(1);
-    $("nPowerSub").textContent = p == null ? "kW" : (p < -0.05 ? "kW in" : "kW out");
-    $("nCurr").textContent = t.packI == null ? "—" : Math.abs(t.packI).toFixed(1);
-    $("nPackV").textContent = fmt(t.packV, 1);
-    $("nDelta").textContent = d == null ? "—" : Math.round(d);
-    $("nCells").textContent = (t.maxV != null && t.minV != null)
-      ? `${(t.maxV / 1000).toFixed(3)} #${t.maxN ?? "?"} · ${(t.minV / 1000).toFixed(3)} #${t.minN ?? "?"}` : "—";
-    $("nTemps").textContent = (t.maxT != null || t.minT != null) ? `${fmt(t.maxT, 0)} / ${fmt(t.minT, 0)} °C` : "—";
-    $("nLv").textContent = t.lv == null ? "—" : t.lv.toFixed(2) + " V" + lvStatus(t.lv).tag;
-    $("nLv").style.color = t.lv != null && lvStatus(t.lv).bad ? "var(--crit)" : "#b7c3d6";
-    $("nEta").textContent = etaText();
-    /* recorder status */
-    if (S.rec) {
-      $("recDot").style.background = "var(--crit)"; $("recDot").style.boxShadow = "0 0 8px var(--crit)";
-      $("recTxt").textContent = `Recording · ${S.rec.samples.length} samples`;
-      $("nPeak").textContent = S.rec.peak && S.rec.peak.delta != null ? `${Math.round(S.rec.peak.delta)} mV @ ${S.rec.peak.soc.toFixed(0)}%` : "—";
-      $("nPeak").style.color = "#b7c3d6";
-    } else {
-      $("recDot").style.background = "var(--warn)"; $("recDot").style.boxShadow = "0 0 8px var(--warn)";
-      $("recTxt").textContent = S.charging ? "Recorder armed · starts at 95%" : "Not charging";
-      $("nPeak").textContent = "— below 95%"; $("nPeak").style.color = "#55627a";
-    }
-    $("nFoot").textContent = (S.charging ? "charging · " : "") + "recorder window 95–100% · tap to brighten";
-    return;
-  }
   $("vSoc").textContent = fmt(t.soc, 1);
   $("vSoh").textContent = fmt(t.soh, 1);
   $("socBar").style.width = (t.soc || 0) + "%";
@@ -1006,57 +936,51 @@ function render() {
   const trip = S.session.odoNow != null && S.session.odoStart != null ? S.session.odoNow - S.session.odoStart : null;
   $("vTrip").textContent = trip == null ? "—" : trip.toFixed(0);
   $("vWhKm").textContent = trip ? ((S.session.eOut - S.session.eIn) * 1000 / trip).toFixed(0) : "—";
+  const rng = S.session.range;
+  const rr = (k, f) => rng[k] ? `▼${f(rng[k].lo)} ▲${f(rng[k].hi)}` : "";
+  $("vPackR").textContent = rr("packV", v => v.toFixed(1));
+  $("vMaxR").textContent = rr("maxV", v => (v / 1000).toFixed(3));
+  $("vMinR").textContent = rr("minV", v => (v / 1000).toFixed(3));
+  $("vLvR").textContent = rr("lv", v => v.toFixed(2));
+  $("vDeltaR").textContent = rng.delta ? ` mV · session ▼${Math.round(rng.delta.lo)} ▲${Math.round(rng.delta.hi)}` : " mV · healthy < 40";
   $("pollStats").textContent = `${S.reads} reads · ${S.misses} misses`;
   $("connDot").classList.toggle("on", elm.connected);
   $("connTxt").textContent = elm.connected ? "Connected" : "Lost";
 }
 
-function etaText() {
-  if (S.socHist.length < 10) return S.charging ? "estimating…" : "—";
-  const [t0, s0] = S.socHist[0], [t1, s1] = S.socHist[S.socHist.length - 1];
-  const rate = (s1 - s0) / (t1 - t0);   // % per ms
-  if (rate <= 0) return S.charging ? "estimating…" : "not charging";
-  const msLeft = (100 - s1) / rate;
-  const eta = new Date(Date.now() + msLeft);
-  return "100% ≈ " + eta.toTimeString().slice(0, 5);
-}
 
 /* ============================ Views ============================ */
 function show(view) {
   S.view = view;
   $("viewConnect").classList.toggle("hidden", view !== "connect");
   $("viewDash").classList.toggle("hidden", view !== "dash");
-  $("viewNight").classList.toggle("hidden", view !== "night");
 }
 function startMonitoring() {
   show("dash");
+  acquireWake();
+  resetDim();
   if (!S.polling) pollLoop();
 }
-async function enterNight() {
-  S.night = true; document.body.classList.add("night"); show("night");
+/* wake lock held the whole time we're monitoring */
+let wakeHeld = false;
+async function acquireWake() {
   try {
     S.wakeLock = await navigator.wakeLock.request("screen");
-    $("wakeTxt").textContent = "wake lock on";
-    S.wakeLock.addEventListener("release", () => { $("wakeTxt").textContent = "wake lock off"; });
-  } catch (e) { $("wakeTxt").textContent = "wake lock unavailable"; }
-  resetDim();
+    wakeHeld = true; $("wakeState").textContent = "Screen on";
+    S.wakeLock.addEventListener("release", () => { wakeHeld = false; $("wakeState").textContent = "Screen off"; });
+  } catch (e) { wakeHeld = false; $("wakeState").textContent = "No wake lock"; }
 }
-function exitNight() {
-  S.night = false; document.body.classList.remove("night", "dim"); show("dash");
-  if (S.wakeLock) { S.wakeLock.release().catch(() => {}); S.wakeLock = null; }
-  clearTimeout(S.dimTimer);
-}
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && S.view === "dash" && !wakeHeld) acquireWake();
+});
+/* passive dim after 30 s idle — same screen, tap to brighten */
+let dimTimer = null;
 function resetDim() {
   document.body.classList.remove("dim");
-  clearTimeout(S.dimTimer);
-  S.dimTimer = setTimeout(() => { if (S.night) document.body.classList.add("dim"); }, 30000);
+  clearTimeout(dimTimer);
+  dimTimer = setTimeout(() => { if (S.view === "dash") document.body.classList.add("dim"); }, 30000);
 }
-document.addEventListener("visibilitychange", async () => {
-  if (document.visibilityState === "visible" && S.night && !S.wakeLock) {
-    try { S.wakeLock = await navigator.wakeLock.request("screen"); $("wakeTxt").textContent = "wake lock on"; } catch (e) {}
-  }
-});
-document.addEventListener("pointerdown", () => { if (S.night) resetDim(); });
+document.addEventListener("pointerdown", () => { if (S.view === "dash") resetDim(); });
 
 /* ============================ Report UI ============================ */
 function showReport(r) {
@@ -1211,8 +1135,6 @@ $("selProfile").onchange = () => {
 };
 $("btnConnect").onclick = () => connectFlow(false);
 $("btnStart").onclick = startMonitoring;
-$("btnNight").onclick = enterNight;
-$("btnDay").onclick = exitNight;
 $("btnTools").onclick = () => { $("ovTools").classList.remove("hidden"); renderLog(); };
 $("btnToolsClose").onclick = () => $("ovTools").classList.add("hidden");
 $("btnReports").onclick = () => { renderReportsList(); $("ovReports").classList.remove("hidden"); };
