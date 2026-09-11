@@ -13,6 +13,19 @@ android {
         versionCode = 1
         versionName = "0.1"
     }
+    flavorDimensions += "ui"
+    productFlavors {
+        create("core") {
+            dimension = "ui"
+            manifestPlaceholders["appLabel"] = "evMonitor"
+        }
+        create("rich") {
+            dimension = "ui"
+            applicationIdSuffix = ".rich"
+            versionNameSuffix = "-rich"
+            manifestPlaceholders["appLabel"] = "evMonitor Rich"
+        }
+    }
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -30,3 +43,10 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 }
+
+// pack the web dashboard (repo root index.html) into the rich flavor's assets
+tasks.register<Copy>("copyWebUi") {
+    from("../../index.html")
+    into("src/rich/assets")
+}
+tasks.named("preBuild") { dependsOn("copyWebUi") }

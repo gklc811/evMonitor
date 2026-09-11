@@ -86,6 +86,10 @@ object Engine {
     private var misses = 0L
     private var sessMode = "default"
     private var userDisconnect = false
+    /* raw transport mode (rich flavor): the WebView UI drives the ELM/UDS protocol */
+    private var rawMode = false
+    var onLinkEvent: ((String) -> Unit)? = null
+    private var transportReadyCb: ((Boolean) -> Unit)? = null
     private val badDids = HashSet<String>()
 
     private const val HDR = "785"
@@ -106,6 +110,7 @@ object Engine {
                 } else {
                     // autoConnect re-attach: the stack reconnects the moment the adapter is back in range
                     update { it.copy(connected = false, status = "Link lost — auto re-attach armed") }
+                    if (rawMode) onLinkEvent?.invoke("disconnected")
                     val ctx = app; val dev = device
                     if (ctx != null && dev != null) {
                         scope.launch {
@@ -150,6 +155,12 @@ object Engine {
         }
     }
 
+    fun connectRaw(ctx: Context, mac: String, cb: (Boolean) -> Unit) {
+        rawMode = true
+        transportReadyCb = cb
+        connect(ctx, mac)
+    }
+
     fun connect(ctx: Context, mac: String) {
         app = ctx.applicationContext
         prefs(ctx).edit().putString("mac", mac).apply()
@@ -165,10 +176,15 @@ object Engine {
                 val ok = withTimeoutOrNull(20000) {
                     suspendCancellableCoroutine { c -> servicesReady = c }
                 } ?: false
-                if (!ok) { update { it.copy(status = "Adapter not reachable") }; return@launch }
+                if (!ok) {
+                    update { it.copy(status = "Adapter not reachable") }
+                    transportReadyCb?.invoke(false); transportReadyCb = null
+                    return@launch
+                }
                 startSession()
             } catch (e: Exception) {
                 update { it.copy(connected = false, status = "Connect failed: ${e.message}") }
+                transportReadyCb?.invoke(false); transportReadyCb = null
             }
         }
     }
@@ -176,7 +192,19 @@ object Engine {
     /** Runs on first connect and every silent re-attach: chars → ELM init → session probe → poll. */
     private suspend fun startSession() {
         try {
-            if (!pickCharacteristics()) { update { it.copy(status = "No ELM327 BLE service on this adapter") }; return }
+            if (!pickCharacteristics()) {
+                update { it.copy(status = "No ELM327 BLE service on this adapter") }
+                transportReadyCb?.invoke(false); transportReadyCb = null
+                return
+            }
+            if (rawMode) {
+                update { it.copy(connected = true, status = "Native link · UI drives protocol", sessMode = "raw") }
+                app?.let { PollService.start(it) }
+                val cb = transportReadyCb
+                if (cb != null) { transportReadyCb = null; cb(true) }
+                else onLinkEvent?.invoke("reconnected")     // silent re-attach path
+                return
+            }
             update { it.copy(connected = true, status = "Initialising ELM…") }
             send("ATZ", 4000)
             for (c in listOf("ATE0", "ATL0", "ATS0", "ATH0", "ATCAF1", "ATSP6", "ATST32")) send(c, 900)
@@ -315,6 +343,11 @@ object Engine {
                 delay(150)
             }
         }
+    }
+
+    /** Raw command from the WebView bridge — expect may be empty. */
+    fun rawSend(cmd: String, timeoutMs: Long, expectMarker: String, cb: (String) -> Unit) {
+        scope.launch { cb(send(cmd, timeoutMs, expectMarker.ifEmpty { null })) }
     }
 
     fun disconnect() {
