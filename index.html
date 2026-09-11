@@ -675,7 +675,7 @@ async function connectFlow(silent) {
       await elm.pick();
     }
     elm.onDisconnect = onAdapterLost;
-    step("stAdapter", "ok", "Adapter linked · " + (elm.dev.name || "BLE OBD"));
+    step("stAdapter", "ok", "Adapter linked · " + ((elm.dev && elm.dev.name) || (window.EvNative ? "native BLE" : "BLE OBD")));
 
     step("stElm", "on");
     await elm.send("ATZ", 4000);
