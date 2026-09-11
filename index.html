@@ -40,8 +40,9 @@
     border-radius: 8px; padding: 10px; font-family: inherit; font-size: 14px; min-height: 44px;
   }
   .hidden { display: none !important; }
-  #viewDash { transition: opacity 1.6s; }
-  body.dim #viewDash { opacity: 0.3; }
+  #viewDash { transition: opacity 1.6s, transform 3s ease-in-out; }
+  body.dim { background: #000; }
+  body.dim #viewDash { opacity: 0.28; }
 
   /* ---------- connect view ---------- */
   #viewConnect { display: flex; flex-direction: column; gap: 14px; padding-top: 22px; flex: 1; }
@@ -973,12 +974,29 @@ async function acquireWake() {
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible" && S.view === "dash" && !wakeHeld) acquireWake();
 });
-/* passive dim after 30 s idle — same screen, tap to brighten */
-let dimTimer = null;
+/* passive dim after 30 s idle — same screen, tap to brighten.
+   While dimmed, the whole panel drifts a few px on a slow random walk
+   (OLED pixel-shift) so no glyph parks on the same pixels overnight. */
+let dimTimer = null, shiftTimer = null;
+function startPixelShift() {
+  stopPixelShift();
+  shiftTimer = setInterval(() => {
+    const x = Math.round(Math.random() * 16 - 8);
+    const y = Math.round(Math.random() * 16 - 8);
+    $("viewDash").style.transform = `translate(${x}px, ${y}px)`;
+  }, 45000);
+}
+function stopPixelShift() {
+  if (shiftTimer) { clearInterval(shiftTimer); shiftTimer = null; }
+  $("viewDash").style.transform = "";
+}
 function resetDim() {
   document.body.classList.remove("dim");
+  stopPixelShift();
   clearTimeout(dimTimer);
-  dimTimer = setTimeout(() => { if (S.view === "dash") document.body.classList.add("dim"); }, 30000);
+  dimTimer = setTimeout(() => {
+    if (S.view === "dash") { document.body.classList.add("dim"); startPixelShift(); }
+  }, 30000);
 }
 document.addEventListener("pointerdown", () => { if (S.view === "dash") resetDim(); });
 
