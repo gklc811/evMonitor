@@ -529,11 +529,11 @@ class Elm {
       this.buf = "";
       const t = setTimeout(() => { if (this.waiter) { this.waiter = null; const r = this.buf; this.buf = ""; res(r); } }, timeout);
       this.waiter = { res, t, expect: expect ? expect.toUpperCase() : null };
-      logLine("> " + cmd, "tx");
+      if (ioLogOn()) logLine("> " + cmd, "tx");
       const data = new TextEncoder().encode(cmd + "\r");
       const p = this.wr.properties.writeWithoutResponse ? this.wr.writeValueWithoutResponse(data) : this.wr.writeValue(data);
       p.catch(() => { clearTimeout(t); this.waiter = null; res(""); });
-    }).then(r => { const c = r.replace(/[\r\n>]+/g, " ").trim(); if (c) logLine("< " + c); return r; });
+    }).then(r => { if (ioLogOn()) { const c = r.replace(/[\r\n>]+/g, " ").trim(); if (c) logLine("< " + c); } return r; });
     this.q = this.q.then(run, run);
     return this.q;
   }
@@ -588,6 +588,7 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
 };
 const logBuf = [];
+function ioLogOn() { const o = document.getElementById("ovTools"); return !!o && !o.classList.contains("hidden"); }
 function logLine(msg, cls) {
   logBuf.push([msg, cls]);
   if (logBuf.length > 250) logBuf.shift();
@@ -790,7 +791,7 @@ async function pollLoop() {
   let lastTP = 0;
   const BATCHES = [["soc", "packV", "packI"], ["maxV", "minV", "maxN", "minN"], ["delta", "lv"]];
   while (S.polling && elm.connected) {
-    for (const b of BATCHES) { if (!S.polling) break; await readBatch(b); }
+    for (const b of BATCHES) { if (!S.polling) break; await readBatch(b); render(); }
     await readKey(SLOW_KEYS[slowIdx++ % SLOW_KEYS.length]);
     if (Date.now() - lastTP > 2500) { await elm.send("3E80", 800); lastTP = Date.now(); }
     tick();
@@ -975,6 +976,7 @@ function setCol(id, c) { const k = "c:" + id; if (_tc[k] !== c) { _tc[k] = c; $(
 function setW(id, w) { const k = "w:" + id; if (_tc[k] !== w) { _tc[k] = w; $(id).style.width = w; } }
 
 function render() {
+  if (document.hidden) return;              // no DOM work in background — recorder keeps sampling
   const t = S.t, d = liveDelta();
   setT("vSoc", fmt(t.soc, 1));
   setT("vSoh", fmt(t.soh, 1));
@@ -1043,7 +1045,10 @@ async function acquireWake() {
   } catch (e) { wakeHeld = false; $("wakeState").textContent = "No wake lock"; }
 }
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible" && S.view === "dash" && !wakeHeld) acquireWake();
+  if (document.visibilityState === "visible") {
+    render();                               // repaint immediately on return
+    if (S.view === "dash" && !wakeHeld) acquireWake();
+  }
 });
 /* passive dim after 30 s idle — same screen, tap to brighten.
    While dimmed, the whole panel drifts a few px on a slow random walk
@@ -1179,6 +1184,7 @@ function wireDcScrub(r, c) {
   const s = r.samples;
   const move = ev => {
     const rect = svg.getBoundingClientRect();
+    if (!rect.width) return;
     const vx = (ev.clientX - rect.left) / rect.width * 330;
     if (vx < 30 || vx > 326) { clear(); return; }
     const ts = c.t0 + (Math.min(322, Math.max(34, vx)) - 34) / 288 * (c.t1 - c.t0);
@@ -1199,7 +1205,7 @@ function wireDcScrub(r, c) {
     for (const id of ["dcX", "dcP1", "dcP2", "dcP3"]) $(id).setAttribute("visibility", "hidden");
     $("dcChip").textContent = "touch the chart to read values";
   };
-  svg.addEventListener("pointerdown", ev => { svg.setPointerCapture(ev.pointerId); move(ev); });
+  svg.addEventListener("pointerdown", ev => { move(ev); try { svg.setPointerCapture(ev.pointerId); } catch (e) {} });
   svg.addEventListener("pointermove", ev => { if (ev.buttons) move(ev); });
 }
 
