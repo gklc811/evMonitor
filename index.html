@@ -41,7 +41,7 @@
   }
   .hidden { display: none !important; }
   #viewDash { transition: opacity 1.6s, transform 3s ease-in-out; }
-  #vPower { transition: color 2s ease; }
+  #vPower { transition: color 0.8s ease; }
   body.dim { background: #000; }
   body.dim #viewDash { opacity: 0.28; }
 
@@ -575,7 +575,7 @@ const S = {
   reads: 0, misses: 0,
   session: { start: 0, eOut: 0, eIn: 0, lastT: 0, lastP: 0, odoStart: null, odoNow: null, range: {} },
   charging: false, chargeStreak: 0, idleStreak: 0,
-  powerState: "idle", pendState: "idle", pendStreak: 0,
+  powerState: "idle", pendState: "idle", pendStreak: 0, powerEma: null,
   rec: null,                               // active recording window
   socHist: [],                             // [t, soc] for ETA
   wakeLock: null, dimTimer: null,
@@ -847,6 +847,8 @@ function tick() {
   /* session lo/hi ranges for the readouts */
   const dNow = liveDelta();
   const pNow = (t.packV != null && t.packI != null) ? t.packV * t.packI / 1000 : null;
+  /* smoothed power drives the colour: regen shows within ~1-2s, organically */
+  if (pNow != null) S.powerEma = S.powerEma == null ? pNow : S.powerEma + 0.35 * (pNow - S.powerEma);
   const rngSrc = { packV: t.packV, maxV: t.maxV, minV: t.minV, delta: dNow, lv: t.lv, power: pNow, curr: t.packI };
   for (const k in rngSrc) {
     const v = rngSrc[k];
@@ -912,6 +914,14 @@ function getReports() { try { return JSON.parse(store.get("evm_reports")) || [];
 
 /* ============================ Rendering ============================ */
 function fmt(v, dp) { return v == null || isNaN(v) ? "—" : v.toFixed(dp); }
+const PC_NEUTRAL = [232, 237, 246], PC_RED = [248, 159, 159], PC_BLUE = [143, 194, 255];
+function powerColor(ema) {
+  if (ema == null) return "var(--ink)";
+  const k = Math.min(1, Math.abs(ema) / 8);        // full tint at ~8 kW
+  const target = ema > 0 ? PC_RED : PC_BLUE;
+  const c = PC_NEUTRAL.map((n, i) => Math.round(n + (target[i] - n) * k));
+  return `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
+}
 function lvStatus(v) {
   if (v > 13.0)  return { label: "DCDC float", color: "var(--good)", bad: false, tag: " · float" };
   if (v < 11.8)  return { label: "critical",   color: "var(--crit)", bad: true,  tag: " · LOW" };
@@ -926,8 +936,9 @@ function render() {
   $("vKwhLeft").textContent = t.soc != null && S.profile ? `≈ ${(S.profile.kwh * t.soc / 100).toFixed(1)} kWh` : "—";
   const p = (t.packV != null && t.packI != null) ? t.packV * t.packI / 1000 : null;
   $("vPower").textContent = p == null ? "—" : Math.abs(p).toFixed(2);
-  // state lives in the colour alone: light blue charging, light red discharging
-  $("vPower").style.color = S.powerState === "charge" ? "#8fc2ff" : S.powerState === "discharge" ? "#f89f9f" : "var(--ink)";
+  // continuous colour from smoothed power: neutral -> light red (discharge)
+  // or -> light blue (charge/regen), saturating by |power| so hard regen reads fully blue
+  $("vPower").style.color = powerColor(S.powerEma);
   $("vCurr").textContent = t.packI == null ? "—" : Math.abs(t.packI).toFixed(1);
   $("vPackV").textContent = fmt(t.packV, 1);
   $("vMaxV").textContent = t.maxV == null ? "—" : (t.maxV / 1000).toFixed(3);
