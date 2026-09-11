@@ -41,6 +41,7 @@
   }
   .hidden { display: none !important; }
   #viewDash { transition: opacity 1.6s, transform 3s ease-in-out; }
+  #vPower { transition: color 2s ease; }
   body.dim { background: #000; }
   body.dim #viewDash { opacity: 0.28; }
 
@@ -168,12 +169,14 @@
     <div class="card" style="padding: 11px 12px; display: flex; flex-direction: column; gap: 3px;">
       <div class="lbl tile-lbl">Power</div>
       <span class="num" style="font-size: 21px; font-weight: 600;" id="vPower">—</span>
-      <span class="num" style="font-size: 10px; color: var(--sec);" id="vPowerSub">kW</span>
+      <span class="num" style="font-size: 10px; color: var(--sec);">kW</span>
+      <span class="num" style="font-size: 9.5px; color: var(--mut);" id="vPowerR"></span>
     </div>
     <div class="card" style="padding: 11px 12px; display: flex; flex-direction: column; gap: 3px;">
       <div class="lbl tile-lbl">Current</div>
       <span class="num" style="font-size: 21px; font-weight: 600;" id="vCurr">—</span>
-      <span class="num" style="font-size: 10px; color: var(--sec);" id="vCurrSub">A</span>
+      <span class="num" style="font-size: 10px; color: var(--sec);">A</span>
+      <span class="num" style="font-size: 9.5px; color: var(--mut);" id="vCurrR"></span>
     </div>
     <div class="card" style="padding: 11px 12px; display: flex; flex-direction: column; gap: 3px;">
       <div class="lbl tile-lbl">Pack</div>
@@ -572,6 +575,7 @@ const S = {
   reads: 0, misses: 0,
   session: { start: 0, eOut: 0, eIn: 0, lastT: 0, lastP: 0, odoStart: null, odoNow: null, range: {} },
   charging: false, chargeStreak: 0, idleStreak: 0,
+  powerState: "idle", pendState: "idle", pendStreak: 0,
   rec: null,                               // active recording window
   socHist: [],                             // [t, soc] for ETA
   wakeLock: null, dimTimer: null,
@@ -830,9 +834,20 @@ function tick() {
     if (!S.charging && S.chargeStreak >= 3) S.charging = true;
     if (S.charging && S.idleStreak >= 25) { S.charging = false; finalizeRec(); }
   }
-  /* session lo/hi ranges for the voltage readouts */
+  /* power-state machine: charge / discharge / idle, 3-sample dead-band
+     so regen blips and stop-and-go never flicker the colour or the dim rule */
+  if (t.packI != null) {
+    const target = t.packI < -0.5 ? "charge" : t.packI > 0.8 ? "discharge" : "idle";
+    if (target === S.pendState) S.pendStreak++; else { S.pendState = target; S.pendStreak = 1; }
+    if (S.pendStreak >= 3 && S.powerState !== S.pendState) {
+      S.powerState = S.pendState;
+      onPowerStateChange();
+    }
+  }
+  /* session lo/hi ranges for the readouts */
   const dNow = liveDelta();
-  const rngSrc = { packV: t.packV, maxV: t.maxV, minV: t.minV, delta: dNow, lv: t.lv };
+  const pNow = (t.packV != null && t.packI != null) ? t.packV * t.packI / 1000 : null;
+  const rngSrc = { packV: t.packV, maxV: t.maxV, minV: t.minV, delta: dNow, lv: t.lv, power: pNow, curr: t.packI };
   for (const k in rngSrc) {
     const v = rngSrc[k];
     if (v == null) continue;
@@ -911,9 +926,9 @@ function render() {
   $("vKwhLeft").textContent = t.soc != null && S.profile ? `≈ ${(S.profile.kwh * t.soc / 100).toFixed(1)} kWh` : "—";
   const p = (t.packV != null && t.packI != null) ? t.packV * t.packI / 1000 : null;
   $("vPower").textContent = p == null ? "—" : Math.abs(p).toFixed(2);
-  $("vPowerSub").textContent = p == null ? "kW" : (p < -0.05 ? "kW · charging" : "kW · drive");
+  // state lives in the colour alone: light blue charging, light red discharging
+  $("vPower").style.color = S.powerState === "charge" ? "#8fc2ff" : S.powerState === "discharge" ? "#f89f9f" : "var(--ink)";
   $("vCurr").textContent = t.packI == null ? "—" : Math.abs(t.packI).toFixed(1);
-  $("vCurrSub").textContent = t.packI == null ? "A" : (t.packI < -0.05 ? "A · charge" : "A · discharge");
   $("vPackV").textContent = fmt(t.packV, 1);
   $("vMaxV").textContent = t.maxV == null ? "—" : (t.maxV / 1000).toFixed(3);
   $("vMinV").textContent = t.minV == null ? "—" : (t.minV / 1000).toFixed(3);
@@ -943,6 +958,8 @@ function render() {
   $("vMaxR").textContent = rr("maxV", v => (v / 1000).toFixed(3));
   $("vMinR").textContent = rr("minV", v => (v / 1000).toFixed(3));
   $("vLvR").textContent = rr("lv", v => v.toFixed(2));
+  $("vPowerR").textContent = rr("power", v => v.toFixed(1));
+  $("vCurrR").textContent = rr("curr", v => v.toFixed(1));
   $("vDeltaR").textContent = rng.delta ? ` mV · session ▼${Math.round(rng.delta.lo)} ▲${Math.round(rng.delta.hi)}` : " mV · healthy < 40";
   $("pollStats").textContent = `${S.reads} reads · ${S.misses} misses`;
   $("connDot").classList.toggle("on", elm.connected);
@@ -990,13 +1007,24 @@ function stopPixelShift() {
   if (shiftTimer) { clearInterval(shiftTimer); shiftTimer = null; }
   $("viewDash").style.transform = "";
 }
+/* Option A: never dim while discharging (driving); dim while charging or idle */
+function dimAllowed() { return S.powerState !== "discharge"; }
 function resetDim() {
   document.body.classList.remove("dim");
   stopPixelShift();
   clearTimeout(dimTimer);
   dimTimer = setTimeout(() => {
-    if (S.view === "dash") { document.body.classList.add("dim"); startPixelShift(); }
+    if (S.view === "dash" && dimAllowed()) { document.body.classList.add("dim"); startPixelShift(); }
   }, 30000);
+}
+function onPowerStateChange() {
+  if (S.powerState === "discharge") {
+    document.body.classList.remove("dim");
+    stopPixelShift();
+    clearTimeout(dimTimer);
+  } else {
+    resetDim();
+  }
 }
 document.addEventListener("pointerdown", () => { if (S.view === "dash") resetDim(); });
 
