@@ -136,7 +136,7 @@
     </div>
     <div style="display: flex; align-items: center; gap: 8px;">
       <div class="pill"><span class="dot" id="connDot"></span><span class="lbl" style="font-size: 11px; font-weight: 600; color: var(--sec);" id="connTxt">—</span></div>
-      <button class="iconbtn" id="btnReports" title="Reports"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="#93a1b8" stroke-width="1.4"><path d="M3 2h10v12H3z M5.5 5.5h5 M5.5 8h5 M5.5 10.5h3"></path></svg></button>
+      <button class="iconbtn" id="btnReports" title="Reports" style="position: relative;"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="#93a1b8" stroke-width="1.4"><path d="M3 2h10v12H3z M5.5 5.5h5 M5.5 8h5 M5.5 10.5h3"></path></svg><span id="repDot" class="hidden" style="position: absolute; top: 3px; right: 3px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 5px var(--accent);"></span></button>
       <div class="pill" title="wake lock"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#f5b73d" stroke-width="1.4"><circle cx="8" cy="8" r="3"></circle><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M12.6 3.4l-1.4 1.4M4.8 11.2l-1.4 1.4"></path></svg><span class="lbl" style="font-size: 10px; font-weight: 600; color: var(--sec);" id="wakeState">Screen —</span></div>
     </div>
   </div>
@@ -263,7 +263,10 @@
 
   <div class="foot" style="margin-top: auto; display: flex; justify-content: space-between; align-items: center; padding: 2px;">
     <span class="num" style="font-size: 10px; color: var(--mut);" id="pollStats">—</span>
-    <button class="ghost" style="min-height: 30px; padding: 4px 10px; font-size: 11px;" id="btnTools">Tools</button>
+    <div style="display: flex; gap: 8px;">
+      <button class="ghost" style="min-height: 30px; padding: 4px 10px; font-size: 11px;" id="btnPause">Pause</button>
+      <button class="ghost" style="min-height: 30px; padding: 4px 10px; font-size: 11px;" id="btnTools">Tools</button>
+    </div>
   </div>
 </div>
 
@@ -579,6 +582,7 @@ const S = {
   powerState: "idle", pendState: "idle", pendStreak: 0, powerEma: null,
   rec: null,                               // active 95-100% AC recording window
   chg: null,                               // unified charge-session recorder (AC + DC)
+  sessMode: "default", chargeSince: 0, badDids: {}, pendingReport: null,
   wakeLock: null, dimTimer: null,
   lastOdoAt: 0,
 };
@@ -659,13 +663,14 @@ async function connectFlow(silent) {
     step("stBms", "on");
     if (!prof) {
       // fingerprint: Tata?
-      await elm.send("ATSH785", 600); await elm.send("ATCRA78D", 600); await elm.send("1003", 900);
-      if (flatHex(await elm.send("223402", 1200)).includes("6234")) prof = PROFILES[0];
+      await elm.send("ATSH785", 600); await elm.send("ATCRA78D", 600);
+      let fp = flatHex(await elm.send("223402", 1200)).includes("6234");
+      if (!fp) { await elm.send("1003", 900); fp = flatHex(await elm.send("223402", 1200)).includes("6234"); }
+      if (fp) prof = PROFILES[0];
     }
     if (!prof) prof = PROFILES.find(p => p.id === $("selProfile").value) || PROFILES[0];
     await elm.send("ATSH" + prof.hdr, 600); await elm.send("ATCRA" + prof.rx, 600);
-    const sess = flatHex(await elm.send("1003", 1500));
-    const alive = flatHex(await elm.send("22" + FAMILIES[prof.fam].soc.did, 1500)).includes("62");
+    const alive = await establishSession(prof);
     step("stBms", alive ? "ok" : "fail", alive ? `BMS on ${prof.hdr}/${prof.rx} · responding` : `BMS on ${prof.hdr} — no answer (ignition on?)`);
 
     setProfile(prof, vin ? "matched from VIN prefix " + vin.slice(0, 6) : "CAN fingerprint / manual");
@@ -710,34 +715,62 @@ let reconTimer = null;
 function scheduleReconnect() {
   if (reconTimer) return;
   let tries = 0;
-  reconTimer = setInterval(async () => {
-    if (elm.connected) { clearInterval(reconTimer); reconTimer = null; return; }
-    if (document.visibilityState !== "visible") return;
-    if (++tries > 75) { clearInterval(reconTimer); reconTimer = null; $("connTxt").textContent = "Lost"; return; }
-    try {
-      if ((await elm.reconnectSilent()).ok) {
-        clearInterval(reconTimer); reconTimer = null;
-        await quickInit();
-        logLine("reconnected · session restored", "ok");
-        $("connTxt").textContent = "Connected";
-        if (!S.polling) pollLoop();
-      }
-    } catch (e) {}
-  }, 8000);
+  const attempt = async () => {
+    reconTimer = null;
+    if (elm.connected) return;
+    if (++tries > 120) { $("connTxt").textContent = "Lost"; return; }
+    if (document.visibilityState === "visible") {
+      try {
+        if ((await elm.reconnectSilent()).ok) {
+          await quickInit();
+          logLine("reconnected · session restored", "ok");
+          $("connTxt").textContent = "Connected";
+          if (!S.polling) pollLoop();
+          return;
+        }
+      } catch (e) {}
+    }
+    reconTimer = setTimeout(attempt, tries < 2 ? 2000 : 5000);
+  };
+  reconTimer = setTimeout(attempt, 1000);   // first retry after just 1 s
 }
+
 async function quickInit() {
   for (const c of ["ATE0", "ATL0", "ATS0", "ATH0", "ATCAF1", "ATSP6", "ATST32"]) await elm.send(c, 800);
   await elm.send("ATSH" + S.profile.hdr, 600);
   await elm.send("ATCRA" + S.profile.rx, 600);
-  await elm.send("1003", 1200);
+  await establishSession(S.profile);
+}
+
+/* Prefer the DEFAULT diagnostic session: holding an extended session (10 03 +
+   tester-present) can make the BMS derate regen. Only fall back to extended
+   if the data DIDs refuse to answer without it. */
+async function establishSession(prof) {
+  const socDid = FAMILIES[prof.fam].soc.did;
+  const probe = async () => flatHex(await elm.send("22" + socDid, 1200, "62" + socDid)).includes("62" + socDid);
+  let ok = await probe();
+  if (ok) { S.sessMode = "default"; }
+  else {
+    await elm.send("1003", 1200);
+    ok = await probe();
+    S.sessMode = ok ? "extended" : "default";
+  }
+  if (ok) logLine("BMS session: " + S.sessMode + (S.sessMode === "default" ? " — no diag session held (regen-safe)" : " — extended required by ECU"), "ok");
+  if (S.profile) $("dashSub").textContent = `BMS Live · ${prof.hdr}/${prof.rx} · ${S.sessMode}`;
+  return ok;
 }
 
 /* ============================ Polling ============================ */
 async function readKey(key) {
   const e = FAMILIES[S.profile.fam][key];
-  if (!e) return null;
-  const bytes = udsPayload(await elm.send("22" + e.did, 1000, "62" + e.did), "62", e.did);
-  if (!bytes) { S.misses++; return null; }
+  if (!e || S.badDids[e.did]) return null;
+  const resp = await elm.send("22" + e.did, 1000, "62" + e.did);
+  const bytes = udsPayload(resp, "62", e.did);
+  if (!bytes) {
+    if (flatHex(resp).includes("7F22")) { S.badDids[e.did] = 1; logLine("DID $" + e.did + " not supported by this BMS — skipping from now on", "info"); }
+    else S.misses++;
+    return null;
+  }
   S.reads++;
   const v = decodeEntry(e, bytes);
   if (v !== null) S.t[key] = v;
@@ -749,7 +782,7 @@ async function readKey(key) {
 S.multiOk = null;
 async function readBatch(keys) {
   const fam = FAMILIES[S.profile.fam];
-  const entries = keys.map(k => [k, fam[k]]).filter(([, e]) => e);
+  const entries = keys.map(k => [k, fam[k]]).filter(([, e]) => e && !S.badDids[e.did]);
   if (!entries.length) return;
   if (S.multiOk === false || entries.length === 1) {
     for (const [k] of entries) await readKey(k);
@@ -789,11 +822,11 @@ async function pollLoop() {
   S.polling = true;
   S.session.start = S.session.start || Date.now();
   let lastTP = 0;
-  const BATCHES = [["soc", "packV", "packI"], ["maxV", "minV", "maxN", "minN"], ["delta", "lv"]];
+  const BATCHES = [["soc", "packV", "packI"], ["maxV", "minV", "maxN"], ["minN", "delta", "lv"]];
   while (S.polling && elm.connected) {
     for (const b of BATCHES) { if (!S.polling) break; await readBatch(b); render(); }
     await readKey(SLOW_KEYS[slowIdx++ % SLOW_KEYS.length]);
-    if (Date.now() - lastTP > 2500) { await elm.send("3E80", 800); lastTP = Date.now(); }
+    if (S.sessMode === "extended" && Date.now() - lastTP > 2500) { await elm.send("3E80", 800); lastTP = Date.now(); }
     tick();
     render();
     // odometer every 2 min, not while charging
@@ -833,7 +866,7 @@ function tick() {
   /* charging state machine */
   if (t.packI != null) {
     if (t.packI < -0.5) { S.chargeStreak++; S.idleStreak = 0; } else { S.idleStreak++; S.chargeStreak = 0; }
-    if (!S.charging && S.chargeStreak >= 3) S.charging = true;
+    if (!S.charging && S.chargeStreak >= 3) { S.charging = true; S.chargeSince = now; }
     if (S.charging && S.idleStreak >= 25) { S.charging = false; finalizeCharge(); }
   }
   /* power-state machine: charge / discharge / idle, 3-sample dead-band
@@ -880,10 +913,10 @@ function tick() {
   }
   /* unified charge-session recorder: every charge, adaptive resolution */
   const chgKw = pNow != null && pNow < 0 ? -pNow : 0;
-  if (S.charging && !S.chg) {
+  if (S.charging && !S.chg && now - S.chargeSince >= 60000) {
     S.chg = { start: now, socStart: t.soc, samples: [], last: 0, peakKw: 0, peakSoc: null,
               tpStart: (t.avgT ?? t.maxT), tpMax: -999, dLo: null, dHi: null, eInStart: S.session.eIn };
-    logLine("charge session recording", "ok");
+    logLine("charge session recording (sustained 60 s)", "ok");
   }
   if (S.chg) {
     if (chgKw > S.chg.peakKw) { S.chg.peakKw = chgKw; S.chg.peakSoc = t.soc; }
@@ -915,6 +948,9 @@ function finalizeCharge() {
   const last = c.samples[c.samples.length - 1];
   const durMin = (last.t - c.start) / 60000;
   const eIn = S.session.eIn - c.eInStart;
+  const socRise = (last.soc != null && c.socStart != null) ? last.soc - c.socStart : 0;
+  // a genuine charge always raises SOC; regen while driving never does
+  if (socRise < 0.5) { logLine("regen/transient discarded — no net SOC rise (" + socRise.toFixed(1) + "%, " + eIn.toFixed(2) + " kWh)", "info"); return; }
   const report = {
     id: Date.now(), type: "chg", start: c.start, end: last.t,
     socStart: c.socStart, socEnd: last.soc,
@@ -930,7 +966,10 @@ function finalizeCharge() {
   store.set("evm_reports", JSON.stringify(all));
   logLine("charge report saved — " + (report.peakKw >= 20 ? "DC" : "AC") + " peak " + report.peakKw + " kW" +
     (report.top && report.top.delta != null ? " · top ΔV " + Math.round(report.top.delta) + " mV" : ""), "ok");
-  showReport(report);
+  if (S.powerState === "discharge") {           // driving: badge it, never pop a sheet over the road
+    S.pendingReport = report.id;
+    $("repDot").classList.remove("hidden");
+  } else showReport(report);
 }
 function getReports() { try { return JSON.parse(store.get("evm_reports")) || []; } catch (e) { return []; } }
 
@@ -1333,8 +1372,24 @@ $("selProfile").onchange = () => {
 $("btnConnect").onclick = () => connectFlow(false);
 $("btnStart").onclick = startMonitoring;
 $("btnTools").onclick = () => { $("ovTools").classList.remove("hidden"); renderLog(); };
+$("btnPause").onclick = async () => {
+  if (S.polling) {
+    S.polling = false;
+    $("btnPause").textContent = "Resume";
+    $("connTxt").textContent = "Paused";
+    logLine("diagnostics paused — bus silent (any diag session expires in ~5 s)", "info");
+  } else if (elm.connected) {
+    $("btnPause").textContent = "Pause";
+    $("connTxt").textContent = "Connected";
+    await establishSession(S.profile);
+    if (!S.polling) pollLoop();
+  }
+};
 $("btnToolsClose").onclick = () => $("ovTools").classList.add("hidden");
-$("btnReports").onclick = () => { renderReportsList(); $("ovReports").classList.remove("hidden"); };
+$("btnReports").onclick = () => {
+  $("repDot").classList.add("hidden"); S.pendingReport = null;
+  renderReportsList(); $("ovReports").classList.remove("hidden");
+};
 $("btnReportsClose").onclick = () => $("ovReports").classList.add("hidden");
 $("btnScan").onclick = scanRange;
 $("btnReadAll").onclick = readAllOnce;
