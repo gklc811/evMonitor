@@ -104,7 +104,9 @@ class MainActivity : Activity() {
     /* ---------------- permissions ---------------- */
     private var pendingAction: (() -> Unit)? = null
     private fun ensurePermissions(action: () -> Unit) {
-        val needed = if (Build.VERSION.SDK_INT >= 31)
+        val needed = if (Build.VERSION.SDK_INT >= 33)
+            arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.POST_NOTIFICATIONS)
+        else if (Build.VERSION.SDK_INT >= 31)
             arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT)
         else arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
         val missing = needed.filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
