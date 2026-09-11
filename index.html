@@ -16,7 +16,7 @@
     --accent: #4d9fff; --good: #3fd68c; --crit: #f26d6d; --warn: #f5b73d;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-  html, body { height: 100%; }
+  html, body { height: 100%; overscroll-behavior: none; }
   body {
     background: var(--bg); color: var(--ink);
     font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
@@ -584,7 +584,7 @@ const S = {
   chg: null,                               // unified charge-session recorder (AC + DC)
   sessMode: "default", chargeSince: 0, badDids: {}, pendingReport: null,
   wakeLock: null, dimTimer: null,
-  lastOdoAt: 0,
+  lastOdoAt: 0, lastSave: 0,
 };
 const $ = id => document.getElementById(id);
 const store = {
@@ -1399,6 +1399,16 @@ $("termIn").addEventListener("keydown", e => { if (e.key === "Enter") $("btnSend
 
 /* restore profile + compat check */
 (function init() {
+  try {
+    const lv = JSON.parse(sessionStorage.getItem("evm_live"));
+    if (lv && Date.now() - lv.t < 10 * 60000) {
+      Object.assign(S.session, lv.session || {});
+      S.charging = !!lv.charging; S.chargeSince = lv.chargeSince || 0;
+      S.chg = lv.chg || null; S.rec = lv.rec || null;
+      S.reads = lv.reads || 0; S.misses = lv.misses || 0;
+      logLine("session restored after reload — trip/charge stats continue", "ok");
+    }
+  } catch (e) {}
   // release any inherited orientation lock (older installs had a portrait manifest)
   try { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch (e) {}
   const saved = store.get("evm_profile");
