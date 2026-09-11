@@ -578,7 +578,7 @@ const S = {
   charging: false, chargeStreak: 0, idleStreak: 0,
   powerState: "idle", pendState: "idle", pendStreak: 0, powerEma: null,
   rec: null,                               // active 95-100% AC recording window
-  dcRec: null, dcStreak: 0,                // DC fast-charge full-session recorder
+  chg: null,                               // unified charge-session recorder (AC + DC)
   wakeLock: null, dimTimer: null,
   lastOdoAt: 0,
 };
@@ -834,7 +834,7 @@ function tick() {
   if (t.packI != null) {
     if (t.packI < -0.5) { S.chargeStreak++; S.idleStreak = 0; } else { S.idleStreak++; S.chargeStreak = 0; }
     if (!S.charging && S.chargeStreak >= 3) S.charging = true;
-    if (S.charging && S.idleStreak >= 25) { S.charging = false; finalizeRec(); finalizeDc(); }
+    if (S.charging && S.idleStreak >= 25) { S.charging = false; finalizeCharge(); }
   }
   /* power-state machine: charge / discharge / idle, 3-sample dead-band
      so regen blips and stop-and-go never flicker the colour or the dim rule */
@@ -878,29 +878,26 @@ function tick() {
     if (!S.rec.peak || (s.delta != null && s.delta > S.rec.peak.delta)) S.rec.peak = s;
     if (!S.rec.top || s.soc >= S.rec.top.soc) S.rec.top = s;
   }
-  /* DC fast-charge recorder: >=20 kW in, whole session, 10 s resolution */
+  /* unified charge-session recorder: every charge, adaptive resolution */
   const chgKw = pNow != null && pNow < 0 ? -pNow : 0;
-  if (!S.dcRec) {
-    if (S.charging && chgKw >= 20) {
-      if (++S.dcStreak >= 3) {
-        S.dcRec = { start: now, socStart: t.soc, samples: [], last: 0, peakKw: 0, peakSoc: null,
-                    tpStart: (t.avgT ?? t.maxT), tpMax: -999, dLo: null, dHi: null, eInStart: S.session.eIn };
-        logLine("DC fast-charge session recording", "ok");
-      }
-    } else S.dcStreak = 0;
+  if (S.charging && !S.chg) {
+    S.chg = { start: now, socStart: t.soc, samples: [], last: 0, peakKw: 0, peakSoc: null,
+              tpStart: (t.avgT ?? t.maxT), tpMax: -999, dLo: null, dHi: null, eInStart: S.session.eIn };
+    logLine("charge session recording", "ok");
   }
-  if (S.dcRec) {
-    if (chgKw > S.dcRec.peakKw) { S.dcRec.peakKw = chgKw; S.dcRec.peakSoc = t.soc; }
+  if (S.chg) {
+    if (chgKw > S.chg.peakKw) { S.chg.peakKw = chgKw; S.chg.peakSoc = t.soc; }
     const tp = t.avgT ?? t.maxT;
-    if (tp != null && tp > S.dcRec.tpMax) S.dcRec.tpMax = tp;
+    if (tp != null && tp > S.chg.tpMax) S.chg.tpMax = tp;
     if (dNow != null) {
-      if (S.dcRec.dLo == null || dNow < S.dcRec.dLo) S.dcRec.dLo = dNow;
-      if (S.dcRec.dHi == null || dNow > S.dcRec.dHi) S.dcRec.dHi = dNow;
+      if (S.chg.dLo == null || dNow < S.chg.dLo) S.chg.dLo = dNow;
+      if (S.chg.dHi == null || dNow > S.chg.dHi) S.chg.dHi = dNow;
     }
-    if (now - S.dcRec.last >= 10000) {
-      S.dcRec.last = now;
-      S.dcRec.samples.push({ t: now, soc: t.soc, i: t.packI, v: t.packV, tp, d: dNow });
-      if (S.dcRec.samples.length > 720) S.dcRec.samples.shift();
+    const iv = chgKw >= 15 ? 10000 : 60000;         // DC: 10 s · slow AC: 60 s
+    if (now - S.chg.last >= iv) {
+      S.chg.last = now;
+      S.chg.samples.push({ t: now, soc: t.soc, i: t.packI, v: t.packV, tp, d: dNow });
+      if (S.chg.samples.length > 720) S.chg.samples.shift();
     }
   }
 }
@@ -911,45 +908,28 @@ function liveDelta() {
   return null;
 }
 
-function finalizeRec() {
-  if (!S.rec || !S.rec.samples.length) { S.rec = null; return; }
-  const r = S.rec; S.rec = null;
-  /* downsample to ≤ 600 points */
-  const ds = []; const stepN = Math.max(1, Math.floor(r.samples.length / 600));
-  for (let i = 0; i < r.samples.length; i += stepN) ds.push(r.samples[i]);
-  if (ds[ds.length - 1] !== r.samples[r.samples.length - 1]) ds.push(r.samples[r.samples.length - 1]);
+function finalizeCharge() {
+  const c = S.chg, w = S.rec;
+  S.chg = null; S.rec = null;
+  if (!c || c.samples.length < 3) return;
+  const last = c.samples[c.samples.length - 1];
+  const durMin = (last.t - c.start) / 60000;
+  const eIn = S.session.eIn - c.eInStart;
   const report = {
-    id: Date.now(), type: "ac", start: r.start, end: r.samples[r.samples.length - 1].t,
-    socStart: r.socStart, socEnd: r.top ? r.top.soc : null,
-    top: r.top, peak: r.peak, ext: r.ext,
-    eIn: +(S.session.eIn - r.eInAtStart + 0).toFixed(2),
-    eInFull: +S.session.eIn.toFixed(2),
-    samples: ds,
-  };
-  const all = getReports(); all.unshift(report);
-  while (all.length > 20) all.pop();
-  store.set("evm_reports", JSON.stringify(all));
-  logLine("charge report saved — top ΔV " + (report.top && report.top.delta != null ? report.top.delta : "?") + " mV", "ok");
-  showReport(report);
-}
-function finalizeDc() {
-  const r = S.dcRec; S.dcRec = null; S.dcStreak = 0;
-  if (!r || r.samples.length < 6) return;
-  const last = r.samples[r.samples.length - 1];
-  const durMin = (last.t - r.start) / 60000;
-  const eIn = S.session.eIn - r.eInStart;
-  const report = {
-    id: Date.now() + 1, type: "dc", start: r.start, end: last.t,
-    socStart: r.socStart, socEnd: last.soc,
-    peakKw: +r.peakKw.toFixed(1), peakSoc: r.peakSoc,
+    id: Date.now(), type: "chg", start: c.start, end: last.t,
+    socStart: c.socStart, socEnd: last.soc,
+    peakKw: +c.peakKw.toFixed(1), peakSoc: c.peakSoc,
     eIn: +eIn.toFixed(2), avgKw: durMin > 0.5 ? +(eIn * 60 / durMin).toFixed(1) : null,
-    tpStart: r.tpStart, tpMax: r.tpMax > -999 ? r.tpMax : null,
-    dLo: r.dLo, dHi: r.dHi, samples: r.samples,
+    tpStart: c.tpStart, tpMax: c.tpMax > -999 ? c.tpMax : null,
+    dLo: c.dLo, dHi: c.dHi, samples: c.samples,
+    top: w ? w.top : null,                     // present for ANY session that reached 95% — AC or DC
+    winExt: w ? w.ext : null,
   };
   const all = getReports(); all.unshift(report);
   while (all.length > 20) all.pop();
   store.set("evm_reports", JSON.stringify(all));
-  logLine("DC charge report saved — peak " + report.peakKw + " kW", "ok");
+  logLine("charge report saved — " + (report.peakKw >= 20 ? "DC" : "AC") + " peak " + report.peakKw + " kW" +
+    (report.top && report.top.delta != null ? " · top ΔV " + Math.round(report.top.delta) + " mV" : ""), "ok");
   showReport(report);
 }
 function getReports() { try { return JSON.parse(store.get("evm_reports")) || []; } catch (e) { return []; } }
@@ -1088,21 +1068,44 @@ function onPowerStateChange() {
 document.addEventListener("pointerdown", () => { if (S.view === "dash") resetDim(); });
 
 /* ============================ Report UI ============================ */
-const DC_COL = { soc: "#4d9fff", amp: "#c792ea", tp: "#f5b73d" };
+const DC_COL = { soc: "#4d9fff", amp: "#c792ea", tp: "#f5b73d", dv: "#f89f9f" };
 
-function showDcReport(r) {
+function showChargeReport(r) {
   const el = $("reportSheet");
   const hm = ts => new Date(ts).toTimeString().slice(0, 5);
   const durMin = Math.round((r.end - r.start) / 60000);
-  const chart = buildDcChart(r);
+  const chart = r.samples && r.samples.length > 2 ? buildDcChart(r) : null;
+  const isDc = (r.peakKw || 0) >= 20;
+  const badge = isDc
+    ? `<span class="lbl" style="font-size:10px; font-weight:700; color:#c792ea; border:1px solid rgba(199,146,234,0.4); background:rgba(199,146,234,0.08); border-radius:999px; padding:4px 10px;">DC · ${fmt(r.peakKw,1)} kW</span>`
+    : `<span class="lbl" style="font-size:10px; font-weight:700; color:#8fc2ff; border:1px solid rgba(143,194,255,0.4); background:rgba(143,194,255,0.08); border-radius:999px; padding:4px 10px;">AC · ${fmt(r.peakKw,1)} kW</span>`;
+  const top = r.top;
+  const cellV = mv => mv == null ? "—" : (mv / 1000).toFixed(3);
+  const toc = top ? `
+    <div class="card" style="padding:14px 16px; border-color:#35507a; display:flex; flex-direction:column; gap:9px;">
+      <div class="lbl" style="font-size:10px; font-weight:600; color:var(--accent);">Top of charge · ${fmt(top.soc,1)}% @ ${hm(top.t)}</div>
+      <div style="display:flex; align-items:baseline; gap:6px;">
+        <span class="num" style="font-size:32px; font-weight:600; line-height:1;">${top.delta != null ? Math.round(top.delta) : "—"}</span>
+        <span class="num" style="font-size:12px; color:var(--sec);">mV imbalance</span>
+        <span class="lbl" style="font-size:9.5px; font-weight:600; margin-left:auto; border-radius:999px; padding:3px 9px; ${top.delta > 60 ? "color:var(--crit); border:1px solid rgba(242,109,109,.4); background:rgba(242,109,109,.08);" : top.delta > 40 ? "color:var(--warn); border:1px solid rgba(245,183,61,.4); background:rgba(245,183,61,.08);" : "color:var(--good); border:1px solid rgba(63,214,140,.35); background:rgba(63,214,140,.1);"}">${top.delta > 60 ? "Check" : top.delta > 40 ? "Watch" : "Healthy"}</span>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px;">
+        <div><div class="lbl" style="font-size:9px; color:var(--mut);">Max cell</div><div class="num" style="font-size:13px; font-weight:600;">${cellV(top.maxV)} V</div><div class="num" style="font-size:9.5px; color:var(--good);">#${top.maxN ?? "—"}</div></div>
+        <div><div class="lbl" style="font-size:9px; color:var(--mut);">Min cell</div><div class="num" style="font-size:13px; font-weight:600;">${cellV(top.minV)} V</div><div class="num" style="font-size:9.5px; color:var(--crit);">#${top.minN ?? "—"}</div></div>
+        <div><div class="lbl" style="font-size:9px; color:var(--mut);">Pack</div><div class="num" style="font-size:13px; font-weight:600;">${fmt(top.packV,1)} V</div><div class="num" style="font-size:9.5px; color:var(--mut);">${top.packI != null ? Math.abs(top.packI).toFixed(1) + " A tail" : ""}</div></div>
+      </div>
+    </div>` : "";
   el.innerHTML = `
     <div style="display:flex; justify-content:space-between; align-items:center;">
-      <div>
-        <div class="lbl" style="font-size:16px; font-weight:700;">DC fast charge</div>
-        <div class="num" style="font-size:11px; color:var(--mut);">${new Date(r.start).toLocaleDateString(undefined,{weekday:"short"})} ${hm(r.start)} → ${hm(r.end)} · ${durMin} min · ${fmt(r.socStart,0)} → ${fmt(r.socEnd,0)}%</div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div class="lbl" style="font-size:16px; font-weight:700;">Charge report</div>
+        ${badge}
       </div>
+      <div>
       <button class="ghost" style="min-height:34px; padding:6px 12px;" onclick="document.getElementById('ovReport').classList.add('hidden')">Close</button>
+      </div>
     </div>
+    <div class="num" style="font-size:11px; color:var(--mut); margin-top:-6px;">${new Date(r.start).toLocaleDateString(undefined,{weekday:"short"})} ${hm(r.start)} → ${hm(r.end)} · ${durMin} min · ${fmt(r.socStart,0)} → ${fmt(r.socEnd,0)}%</div>
     <div class="card" style="padding:14px 16px; border-color:#35507a;">
       <div style="display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px;">
         <div><div class="lbl" style="font-size:9.5px; color:var(--mut);">Peak power</div><div class="num" style="font-size:16px; font-weight:600; color:#8fc2ff;">${fmt(r.peakKw,1)} kW</div><div class="num" style="font-size:9.5px; color:var(--mut);">${r.peakSoc != null ? "@ " + r.peakSoc.toFixed(0) + "% SOC" : ""}</div></div>
@@ -1115,13 +1118,15 @@ function showDcReport(r) {
         <span style="display:flex; align-items:center; gap:5px;"><span style="width:8px; height:8px; border-radius:50%; background:${DC_COL.soc};"></span><span class="lbl" style="font-size:9.5px; font-weight:600; color:var(--sec);">SOC</span></span>
         <span style="display:flex; align-items:center; gap:5px;"><span style="width:8px; height:8px; border-radius:50%; background:${DC_COL.amp};"></span><span class="lbl" style="font-size:9.5px; font-weight:600; color:var(--sec);">Current</span></span>
         <span style="display:flex; align-items:center; gap:5px;"><span style="width:8px; height:8px; border-radius:50%; background:${DC_COL.tp};"></span><span class="lbl" style="font-size:9.5px; font-weight:600; color:var(--sec);">Avg temp</span></span>
+        <span style="display:flex; align-items:center; gap:5px;"><span style="width:8px; height:8px; border-radius:50%; background:${DC_COL.dv};"></span><span class="lbl" style="font-size:9.5px; font-weight:600; color:var(--sec);">ΔV</span></span>
       </div>
       <div style="display:flex; justify-content:center; min-height:26px;">
         <span class="num" id="dcChip" style="font-size:10.5px; background:var(--panel2); border:1px solid var(--border); border-radius:999px; padding:4px 12px;">touch the chart to read values</span>
       </div>
-      ${chart.svg}
-      <div class="num" style="font-size:9px; color:var(--mut);">Touch or drag to scrub · values snap to the nearest 10 s sample</div>
+      ${chart ? chart.svg : ""}
+      <div class="num" style="font-size:9px; color:var(--mut);">Touch or drag to scrub · values snap to the nearest sample</div>
     </div>
+    ${toc}
     <div class="card" style="padding:12px 15px; display:flex; flex-direction:column; gap:2px;">
       <div class="rowline"><span>ΔV during session</span><span class="num">${r.dLo != null ? Math.round(r.dLo) + " → " + Math.round(r.dHi) + " mV" : "—"}</span></div>
       <div class="rowline"><span>Temp</span><span class="num">${r.tpStart != null ? Math.round(r.tpStart) + " → " + fmt(r.tpMax,0) + " °C" : "—"}</span></div>
@@ -1129,7 +1134,7 @@ function showDcReport(r) {
     </div>
     <button class="primary" onclick="exportCsv(${r.id})">Export CSV</button>`;
   $("ovReport").classList.remove("hidden");
-  wireDcScrub(r, chart);
+  if (chart) wireDcScrub(r, chart);
 }
 
 function buildDcChart(r) {
@@ -1143,8 +1148,8 @@ function buildDcChart(r) {
     if (hi - lo < pad) { hi += pad; lo -= pad; }
     return [lo, hi];
   };
-  const socs = s.map(x => x.soc), amps = s.map(x => x.i != null ? -x.i : null), tps = s.map(x => x.tp);
-  const sSoc = span(socs, 2), sAmp = span([0, ...amps], 5), sTp = span(tps, 1.5);
+  const socs = s.map(x => x.soc), amps = s.map(x => x.i != null ? -x.i : null), tps = s.map(x => x.tp), dvs = s.map(x => x.d);
+  const sSoc = span(socs, 2), sAmp = span([0, ...amps], 5), sTp = span(tps, 1.5), sDv = span(dvs, 4);
   const Y = (v, sp) => sp && v != null ? 118 - (v - sp[0]) / (sp[1] - sp[0]) * 104 : null;
   const pts = (arr, sp) => s.map((x, i) => arr[i] != null ? `${X(x.t).toFixed(1)},${Y(arr[i], sp).toFixed(1)}` : null).filter(Boolean).join(" ");
   const last = s[s.length - 1];
@@ -1157,12 +1162,14 @@ function buildDcChart(r) {
     <line id="dcX" x1="0" y1="12" x2="0" y2="118" stroke="#5c6b84" stroke-dasharray="3 3" visibility="hidden"></line>
     <polyline points="${pts(socs, sSoc)}" fill="none" stroke="${DC_COL.soc}" stroke-width="2" stroke-linejoin="round"></polyline>
     <polyline points="${pts(amps, sAmp)}" fill="none" stroke="${DC_COL.amp}" stroke-width="2" stroke-linejoin="round"></polyline>
-    <polyline points="${pts(tps, sTp)}" fill="none" stroke="${DC_COL.tp}" stroke-width="2" stroke-linejoin="round"></polyline>`;
+    <polyline points="${pts(tps, sTp)}" fill="none" stroke="${DC_COL.tp}" stroke-width="2" stroke-linejoin="round"></polyline>
+    <polyline points="${pts(dvs, sDv)}" fill="none" stroke="${DC_COL.dv}" stroke-width="2" stroke-linejoin="round"></polyline>`;
   // right-edge end labels, de-collided: collect (y, text, colour), then space them >=11px apart
   const ends = [];
   if (last.soc != null) ends.push({ y: Y(last.soc, sSoc), tx: last.soc.toFixed(0) + "%", c: DC_COL.soc });
   if (last.i != null)   ends.push({ y: Y(-last.i, sAmp),  tx: Math.round(-last.i) + " A", c: DC_COL.amp });
   if (last.tp != null)  ends.push({ y: Y(last.tp, sTp),   tx: Math.round(last.tp) + " °C", c: DC_COL.tp });
+  if (last.d != null)   ends.push({ y: Y(last.d, sDv),    tx: Math.round(last.d) + " mV", c: DC_COL.dv });
   ends.sort((a, b) => a.y - b.y);
   for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 11) ends[i].y = ends[i - 1].y + 11;
   for (const e of ends) svg += lbl(320, Math.min(116, Math.max(10, e.y)), e.tx, e.c, "end");
@@ -1171,11 +1178,12 @@ function buildDcChart(r) {
   svg += `<circle id="dcP1" r="4" fill="${DC_COL.soc}" stroke="#0b0e13" stroke-width="1.5" visibility="hidden"></circle>
     <circle id="dcP2" r="4" fill="${DC_COL.amp}" stroke="#0b0e13" stroke-width="1.5" visibility="hidden"></circle>
     <circle id="dcP3" r="4" fill="${DC_COL.tp}" stroke="#0b0e13" stroke-width="1.5" visibility="hidden"></circle>
+    <circle id="dcP4" r="4" fill="${DC_COL.dv}" stroke="#0b0e13" stroke-width="1.5" visibility="hidden"></circle>
     ${lbl(34, 132, "0", "#5c6b84", "middle")}
     ${lbl(178, 132, tickTxt(durM / 2), "#5c6b84", "middle")}
     ${lbl(322, 132, tickTxt(durM), "#5c6b84", "end")}
   </svg>`;
-  return { svg, t0, t1, X, Y, sSoc, sAmp, sTp };
+  return { svg, t0, t1, X, Y, sSoc, sAmp, sTp, sDv };
 }
 
 function wireDcScrub(r, c) {
@@ -1195,91 +1203,48 @@ function wireDcScrub(r, c) {
     const put = (id, v, sp) => { const e = $(id);
       if (v == null) { e.setAttribute("visibility", "hidden"); return; }
       e.setAttribute("cx", x); e.setAttribute("cy", c.Y(v, sp).toFixed(1)); e.setAttribute("visibility", "visible"); };
-    put("dcP1", p.soc, c.sSoc); put("dcP2", p.i != null ? -p.i : null, c.sAmp); put("dcP3", p.tp, c.sTp);
+    put("dcP1", p.soc, c.sSoc); put("dcP2", p.i != null ? -p.i : null, c.sAmp); put("dcP3", p.tp, c.sTp); put("dcP4", p.d, c.sDv);
     const mins = Math.round((p.t - c.t0) / 60000);
     $("dcChip").innerHTML = `${mins} min · <span style="color:${DC_COL.soc}">${p.soc != null ? p.soc.toFixed(1) + "%" : "—"}</span> · ` +
       `<span style="color:${DC_COL.amp}">${p.i != null ? Math.round(-p.i) + " A" : "—"}</span> · ` +
-      `<span style="color:${DC_COL.tp}">${p.tp != null ? Math.round(p.tp) + " °C" : "—"}</span>`;
+      `<span style="color:${DC_COL.tp}">${p.tp != null ? Math.round(p.tp) + " °C" : "—"}</span> · ` +
+      `<span style="color:${DC_COL.dv}">${p.d != null ? Math.round(p.d) + " mV" : "—"}</span>`;
   };
   const clear = () => {
-    for (const id of ["dcX", "dcP1", "dcP2", "dcP3"]) $(id).setAttribute("visibility", "hidden");
+    for (const id of ["dcX", "dcP1", "dcP2", "dcP3", "dcP4"]) $(id).setAttribute("visibility", "hidden");
     $("dcChip").textContent = "touch the chart to read values";
   };
   svg.addEventListener("pointerdown", ev => { move(ev); try { svg.setPointerCapture(ev.pointerId); } catch (e) {} });
   svg.addEventListener("pointermove", ev => { if (ev.buttons) move(ev); });
 }
 
-function showReport(r) {
-  if (r.type === "dc") return showDcReport(r);
-  const el = $("reportSheet");
-  const dur = (t) => new Date(t).toTimeString().slice(0, 5);
-  const day = (t) => new Date(t).toLocaleDateString(undefined, { weekday: "short" });
-  const cellV = mv => mv == null ? "—" : (mv / 1000).toFixed(3);
-  const ex = r.ext || {};
-  const exRow = (k, unit, f) => ex[k] ? `${f(ex[k].lo)} → ${f(ex[k].hi)} ${unit}` : "—";
-  /* sparkline */
-  let spark = "";
-  if (r.samples && r.samples.length > 2) {
-    const pts = r.samples.filter(s => s.delta != null);
-    if (pts.length > 2) {
-      const dmin = Math.min(...pts.map(s => s.delta)), dmax = Math.max(...pts.map(s => s.delta));
-      const smin = pts[0].soc, smax = pts[pts.length - 1].soc || 100;
-      const X = s => 30 + (s.soc - smin) / Math.max(0.5, smax - smin) * 288;
-      const Y = s => 60 - (s.delta - dmin) / Math.max(1, dmax - dmin) * 48;
-      const poly = pts.map(s => `${X(s).toFixed(1)},${Y(s).toFixed(1)}`).join(" ");
-      const pk = r.peak || pts[0];
-      spark = `<svg width="100%" height="84" viewBox="0 0 326 84">
-        <line x1="30" y1="8" x2="30" y2="64" stroke="#232d40"/><line x1="30" y1="64" x2="318" y2="64" stroke="#232d40"/>
-        <text x="26" y="14" fill="#5c6b84" font-size="9" text-anchor="end">${Math.round(dmax)}</text>
-        <text x="26" y="66" fill="#5c6b84" font-size="9" text-anchor="end">${Math.round(dmin)}</text>
-        <text x="30" y="78" fill="#5c6b84" font-size="9" text-anchor="middle">${smin.toFixed(0)}%</text>
-        <text x="318" y="78" fill="#5c6b84" font-size="9" text-anchor="end">${smax.toFixed(0)}%</text>
-        <polyline points="${poly}" fill="none" stroke="#4d9fff" stroke-width="2" stroke-linejoin="round"/>
-        <circle cx="${X(pk)}" cy="${Y(pk)}" r="3.5" fill="#4d9fff"/>
-        <text x="${X(pk)}" y="${Math.max(9, Y(pk) - 8)}" fill="#93a1b8" font-size="9" text-anchor="middle">peak ${Math.round(pk.delta)} @ ${pk.soc.toFixed(0)}%</text>
-      </svg>`;
-    }
+function showReport(r) { showChargeReport(normalizeReport(r)); }
+
+/* adapt reports saved by older app versions to the unified shape */
+function normalizeReport(r) {
+  if (r.type === "chg") return r;
+  if (r.type === "dc") return Object.assign({}, r, { type: "chg", top: r.top || null, winExt: null });
+  // legacy AC window-only report: remap sample fields, derive header stats
+  const samples = (r.samples || []).map(s => ({ t: s.t, soc: s.soc, i: s.packI, v: s.packV, tp: s.maxT, d: s.delta }));
+  let peakKw = 0, peakSoc = null;
+  for (const s of samples) {
+    const kw = (s.i != null && s.v != null && s.i < 0) ? -s.i * s.v / 1000 : 0;
+    if (kw > peakKw) { peakKw = kw; peakSoc = s.soc; }
   }
-  const top = r.top || {};
-  el.innerHTML = `
-    <div style="display:flex; justify-content:space-between; align-items:center;">
-      <div>
-        <div class="lbl" style="font-size:16px; font-weight:700;">Charge report</div>
-        <div class="num" style="font-size:11px; color:var(--mut);">${day(r.start)} · recorded ${dur(r.start)} → ${dur(r.end)} · ${fmt(r.socStart,1)} → ${fmt(r.socEnd,1)}%</div>
-      </div>
-      <button class="ghost" style="min-height:34px; padding:6px 12px;" onclick="document.getElementById('ovReport').classList.add('hidden')">Close</button>
-    </div>
-    <div class="card" style="padding:15px; border-color:#35507a; display:flex; flex-direction:column; gap:10px;">
-      <div class="lbl" style="font-size:11px; font-weight:600; color:var(--accent);">Top of charge · ${fmt(top.soc,1)}% @ ${top.t ? dur(top.t) : "—"}</div>
-      <div style="display:flex; align-items:baseline; gap:6px;">
-        <span class="num" style="font-size:40px; font-weight:600; line-height:1;">${top.delta != null ? Math.round(top.delta) : "—"}</span>
-        <span class="num" style="font-size:13px; color:var(--sec);">mV imbalance</span>
-        <span class="lbl" style="font-size:10px; font-weight:600; margin-left:auto; border-radius:999px; padding:3px 9px; ${top.delta > 60 ? "color:var(--crit); border:1px solid rgba(242,109,109,.4); background:rgba(242,109,109,.08);" : top.delta > 40 ? "color:var(--warn); border:1px solid rgba(245,183,61,.4); background:rgba(245,183,61,.08);" : "color:var(--good); border:1px solid rgba(63,214,140,.35); background:rgba(63,214,140,.1);"}">${top.delta > 60 ? "Check" : top.delta > 40 ? "Watch" : "Healthy"}</span>
-      </div>
-      <div class="grid3">
-        <div><div class="lbl" style="font-size:9.5px; color:var(--mut);">Max cell</div><div class="num" style="font-size:13px; font-weight:600;">${cellV(top.maxV)} V</div><div class="num" style="font-size:10px; color:var(--good);">#${top.maxN ?? "—"}</div></div>
-        <div><div class="lbl" style="font-size:9.5px; color:var(--mut);">Min cell</div><div class="num" style="font-size:13px; font-weight:600;">${cellV(top.minV)} V</div><div class="num" style="font-size:10px; color:var(--crit);">#${top.minN ?? "—"}</div></div>
-        <div><div class="lbl" style="font-size:9.5px; color:var(--mut);">Pack</div><div class="num" style="font-size:13px; font-weight:600;">${fmt(top.packV,1)} V</div><div class="num" style="font-size:10px; color:var(--mut);">${top.packI != null ? Math.abs(top.packI).toFixed(1) + " A tail" : ""}</div></div>
-      </div>
-    </div>
-    ${spark ? `<div class="card" style="padding:13px 15px;"><div class="lbl tile-lbl" style="margin-bottom:6px;">ΔV through the recorded window</div>${spark}</div>` : ""}
-    <div class="card" style="padding:13px 15px; display:flex; flex-direction:column; gap:2px;">
-      <div class="lbl tile-lbl" style="margin-bottom:6px;">Recorded window extremes</div>
-      <div class="rowline"><span>Pack voltage</span><span class="num">${exRow("packV", "V", v => v.toFixed(1))}</span></div>
-      <div class="rowline"><span>Max cell</span><span class="num">${exRow("maxV", "V", v => (v/1000).toFixed(3))} · <span style="color:var(--good);">#${top.maxN ?? "—"}</span></span></div>
-      <div class="rowline"><span>Min cell</span><span class="num">${exRow("minV", "V", v => (v/1000).toFixed(3))} · <span style="color:var(--crit);">#${top.minN ?? "—"}</span></span></div>
-      <div class="rowline"><span>ΔV</span><span class="num">${exRow("delta", "mV", v => Math.round(v))}</span></div>
-      <div class="rowline"><span>Cell temp</span><span class="num">${exRow("maxT", "°C", v => Math.round(v))}</span></div>
-      <div class="rowline"><span>Energy in (window / full)</span><span class="num">${fmt(r.eIn,2)} / ${fmt(r.eInFull,2)} kWh</span></div>
-    </div>
-    <button class="primary" onclick="exportCsv(${r.id})">Export CSV</button>`;
-  $("ovReport").classList.remove("hidden");
+  const ds = samples.map(s => s.d).filter(x => x != null);
+  const tps = samples.map(s => s.tp).filter(x => x != null);
+  return Object.assign({}, r, {
+    type: "chg", samples, peakKw: +peakKw.toFixed(1), peakSoc, avgKw: null,
+    tpStart: tps.length ? tps[0] : null, tpMax: tps.length ? Math.max.apply(null, tps) : null,
+    dLo: ds.length ? Math.min.apply(null, ds) : null, dHi: ds.length ? Math.max.apply(null, ds) : null,
+    winExt: r.ext || null,
+  });
 }
 
 function exportCsv(id) {
   const r = getReports().find(x => x.id === id);
   if (!r) return;
-  const keys = r.type === "dc"
+  const keys = r.samples && r.samples[0] && ("i" in r.samples[0])
     ? ["t", "soc", "i", "v", "tp", "d"]
     : ["t", "soc", "packV", "packI", "maxV", "minV", "maxN", "minN", "delta", "maxT", "minT"];
   const rows = [keys.join(",")];
@@ -1293,13 +1258,13 @@ function exportCsv(id) {
 function renderReportsList() {
   const list = $("reportsList");
   const all = getReports();
-  list.innerHTML = all.length ? "" : `<div class="num" style="color:var(--mut); font-size:12px;">No charge reports yet. They appear after a charge passes 95%.</div>`;
+  list.innerHTML = all.length ? "" : `<div class="num" style="color:var(--mut); font-size:12px;">No charge reports yet. One is saved after every charging session.</div>`;
   for (const r of all) {
     const d = document.createElement("div");
     d.className = "card"; d.style.cssText = "padding:12px 14px; display:flex; justify-content:space-between; align-items:center; cursor:pointer;";
-    const sub = r.type === "dc"
-      ? `DC · ${fmt(r.socStart,0)}→${fmt(r.socEnd,0)}% · peak ${fmt(r.peakKw,1)} kW`
-      : `AC top-up · ${fmt(r.socStart,0)}→${fmt(r.socEnd,0)}% · top ΔV ${r.top && r.top.delta != null ? Math.round(r.top.delta) : "?"} mV`;
+    const n = normalizeReport(r);
+    const sub = `${(n.peakKw || 0) >= 20 ? "DC" : "AC"} · ${fmt(n.socStart,0)}→${fmt(n.socEnd,0)}% · peak ${fmt(n.peakKw,1)} kW` +
+      (n.top && n.top.delta != null ? ` · top ΔV ${Math.round(n.top.delta)} mV` : "");
     d.innerHTML = `<div>
         <div class="num" style="font-size:13px; font-weight:600;">${new Date(r.start).toLocaleDateString()} · ${new Date(r.start).toTimeString().slice(0,5)}</div>
         <div class="num" style="font-size:10.5px; color:var(--mut);">${sub}</div>
