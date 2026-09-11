@@ -190,10 +190,10 @@
     <div style="display: flex; justify-content: space-between; align-items: center;">
       <div class="lbl tile-lbl" style="font-size: 11px;">Cell voltages</div>
       <div style="display: flex; align-items: center; gap: 6px; background: var(--panel2); border-radius: 999px; padding: 4px 10px;">
-        <span class="lbl" style="font-size: 10px; font-weight: 600; color: var(--sec);" id="vBal">Balancing: —</span>
+        <span class="lbl" style="font-size: 10px; font-weight: 600; color: var(--sec);" id="vBal">Balance: —</span>
       </div>
     </div>
-    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;">
+    <div style="display: grid; grid-template-columns: 1.15fr 0.9fr 1.15fr; gap: 8px; align-items: start;">
       <div style="border-left: 2px solid var(--good); padding-left: 10px;">
         <div class="lbl tile-lbl">Max cell</div>
         <div style="display: flex; align-items: baseline; gap: 4px;">
@@ -203,23 +203,24 @@
         <div class="num" style="font-size: 11px; color: var(--good);" id="vMaxN">cell #—</div>
         <div class="num" style="font-size: 9.5px; color: var(--mut);" id="vMaxR"></div>
       </div>
-      <div style="border-left: 2px solid var(--crit); padding-left: 10px;">
+      <div style="text-align: center;">
+        <div class="lbl tile-lbl">Δ</div>
+        <div style="display: flex; align-items: baseline; gap: 3px; justify-content: center;">
+          <span class="num" style="font-size: 23px; font-weight: 600; color: var(--good);" id="vDelta">—</span>
+          <span class="num" style="font-size: 12px; color: var(--sec);">mV</span>
+        </div>
+        <div class="num" style="font-size: 11px; color: var(--mut);">&nbsp;</div>
+        <div class="num" style="font-size: 9.5px; color: var(--mut);" id="vDeltaR"></div>
+      </div>
+      <div style="border-right: 2px solid var(--crit); padding-right: 10px; text-align: right;">
         <div class="lbl tile-lbl">Min cell</div>
-        <div style="display: flex; align-items: baseline; gap: 4px;">
+        <div style="display: flex; align-items: baseline; gap: 4px; justify-content: flex-end;">
           <span class="num" style="font-size: 23px; font-weight: 600;" id="vMinV">—</span>
           <span class="num" style="font-size: 12px; color: var(--sec);">V</span>
         </div>
         <div class="num" style="font-size: 11px; color: var(--crit);" id="vMinN">cell #—</div>
         <div class="num" style="font-size: 9.5px; color: var(--mut);" id="vMinR"></div>
       </div>
-    </div>
-    <div style="display: flex; flex-direction: column; gap: 6px;">
-      <div style="display: flex; justify-content: space-between; align-items: baseline;">
-        <span class="lbl tile-lbl">Imbalance ΔV</span>
-        <span><span class="num" style="font-size: 15px; font-weight: 600; color: var(--good);" id="vDelta">—</span>
-        <span class="num" style="font-size: 11px; color: var(--sec);" id="vDeltaR"> mV · healthy &lt; 40</span></span>
-      </div>
-      <div class="meter" style="height: 6px;"><div id="deltaBar" style="background: var(--good); width: 0%;"></div></div>
     </div>
   </div>
 
@@ -576,8 +577,8 @@ const S = {
   session: { start: 0, eOut: 0, eIn: 0, lastT: 0, lastP: 0, odoStart: null, odoNow: null, range: {} },
   charging: false, chargeStreak: 0, idleStreak: 0,
   powerState: "idle", pendState: "idle", pendStreak: 0, powerEma: null,
-  rec: null,                               // active recording window
-  socHist: [],                             // [t, soc] for ETA
+  rec: null,                               // active 95-100% AC recording window
+  dcRec: null, dcStreak: 0,                // DC fast-charge full-session recorder
   wakeLock: null, dimTimer: null,
   lastOdoAt: 0,
 };
@@ -832,7 +833,7 @@ function tick() {
   if (t.packI != null) {
     if (t.packI < -0.5) { S.chargeStreak++; S.idleStreak = 0; } else { S.idleStreak++; S.chargeStreak = 0; }
     if (!S.charging && S.chargeStreak >= 3) S.charging = true;
-    if (S.charging && S.idleStreak >= 25) { S.charging = false; finalizeRec(); }
+    if (S.charging && S.idleStreak >= 25) { S.charging = false; finalizeRec(); finalizeDc(); }
   }
   /* power-state machine: charge / discharge / idle, 3-sample dead-band
      so regen blips and stop-and-go never flicker the colour or the dim rule */
@@ -857,11 +858,6 @@ function tick() {
     if (v < r.lo) r.lo = v;
     if (v > r.hi) r.hi = v;
   }
-  /* ETA history */
-  if (t.soc != null) {
-    S.socHist.push([now, t.soc]);
-    while (S.socHist.length && now - S.socHist[0][0] > 300000) S.socHist.shift();
-  }
   /* recorder: 95 → 100 % while charging */
   if (S.charging && t.soc != null && t.soc >= 95) {
     if (!S.rec) {
@@ -881,6 +877,31 @@ function tick() {
     if (!S.rec.peak || (s.delta != null && s.delta > S.rec.peak.delta)) S.rec.peak = s;
     if (!S.rec.top || s.soc >= S.rec.top.soc) S.rec.top = s;
   }
+  /* DC fast-charge recorder: >=20 kW in, whole session, 10 s resolution */
+  const chgKw = pNow != null && pNow < 0 ? -pNow : 0;
+  if (!S.dcRec) {
+    if (S.charging && chgKw >= 20) {
+      if (++S.dcStreak >= 3) {
+        S.dcRec = { start: now, socStart: t.soc, samples: [], last: 0, peakKw: 0, peakSoc: null,
+                    tpStart: (t.avgT ?? t.maxT), tpMax: -999, dLo: null, dHi: null, eInStart: S.session.eIn };
+        logLine("DC fast-charge session recording", "ok");
+      }
+    } else S.dcStreak = 0;
+  }
+  if (S.dcRec) {
+    if (chgKw > S.dcRec.peakKw) { S.dcRec.peakKw = chgKw; S.dcRec.peakSoc = t.soc; }
+    const tp = t.avgT ?? t.maxT;
+    if (tp != null && tp > S.dcRec.tpMax) S.dcRec.tpMax = tp;
+    if (dNow != null) {
+      if (S.dcRec.dLo == null || dNow < S.dcRec.dLo) S.dcRec.dLo = dNow;
+      if (S.dcRec.dHi == null || dNow > S.dcRec.dHi) S.dcRec.dHi = dNow;
+    }
+    if (now - S.dcRec.last >= 10000) {
+      S.dcRec.last = now;
+      S.dcRec.samples.push({ t: now, soc: t.soc, i: t.packI, v: t.packV, tp, d: dNow });
+      if (S.dcRec.samples.length > 720) S.dcRec.samples.shift();
+    }
+  }
 }
 function liveDelta() {
   const t = S.t;
@@ -897,7 +918,7 @@ function finalizeRec() {
   for (let i = 0; i < r.samples.length; i += stepN) ds.push(r.samples[i]);
   if (ds[ds.length - 1] !== r.samples[r.samples.length - 1]) ds.push(r.samples[r.samples.length - 1]);
   const report = {
-    id: Date.now(), start: r.start, end: r.samples[r.samples.length - 1].t,
+    id: Date.now(), type: "ac", start: r.start, end: r.samples[r.samples.length - 1].t,
     socStart: r.socStart, socEnd: r.top ? r.top.soc : null,
     top: r.top, peak: r.peak, ext: r.ext,
     eIn: +(S.session.eIn - r.eInAtStart + 0).toFixed(2),
@@ -908,6 +929,26 @@ function finalizeRec() {
   while (all.length > 20) all.pop();
   store.set("evm_reports", JSON.stringify(all));
   logLine("charge report saved — top ΔV " + (report.top && report.top.delta != null ? report.top.delta : "?") + " mV", "ok");
+  showReport(report);
+}
+function finalizeDc() {
+  const r = S.dcRec; S.dcRec = null; S.dcStreak = 0;
+  if (!r || r.samples.length < 6) return;
+  const last = r.samples[r.samples.length - 1];
+  const durMin = (last.t - r.start) / 60000;
+  const eIn = S.session.eIn - r.eInStart;
+  const report = {
+    id: Date.now() + 1, type: "dc", start: r.start, end: last.t,
+    socStart: r.socStart, socEnd: last.soc,
+    peakKw: +r.peakKw.toFixed(1), peakSoc: r.peakSoc,
+    eIn: +eIn.toFixed(2), avgKw: durMin > 0.5 ? +(eIn * 60 / durMin).toFixed(1) : null,
+    tpStart: r.tpStart, tpMax: r.tpMax > -999 ? r.tpMax : null,
+    dLo: r.dLo, dHi: r.dHi, samples: r.samples,
+  };
+  const all = getReports(); all.unshift(report);
+  while (all.length > 20) all.pop();
+  store.set("evm_reports", JSON.stringify(all));
+  logLine("DC charge report saved — peak " + report.peakKw + " kW", "ok");
   showReport(report);
 }
 function getReports() { try { return JSON.parse(store.get("evm_reports")) || []; } catch (e) { return []; } }
@@ -928,55 +969,57 @@ function lvStatus(v) {
   if (v < 12.15) return { label: "low",        color: "var(--warn)", bad: true,  tag: " · low" };
   return { label: "resting", color: "var(--ink)", bad: false, tag: "" };
 }
+const _tc = {};
+function setT(id, v) { if (_tc[id] !== v) { _tc[id] = v; $(id).textContent = v; } }
+function setCol(id, c) { const k = "c:" + id; if (_tc[k] !== c) { _tc[k] = c; $(id).style.color = c; } }
+function setW(id, w) { const k = "w:" + id; if (_tc[k] !== w) { _tc[k] = w; $(id).style.width = w; } }
+
 function render() {
   const t = S.t, d = liveDelta();
-  $("vSoc").textContent = fmt(t.soc, 1);
-  $("vSoh").textContent = fmt(t.soh, 1);
-  $("socBar").style.width = (t.soc || 0) + "%";
-  $("vKwhLeft").textContent = t.soc != null && S.profile ? `≈ ${(S.profile.kwh * t.soc / 100).toFixed(1)} kWh` : "—";
+  setT("vSoc", fmt(t.soc, 1));
+  setT("vSoh", fmt(t.soh, 1));
+  setW("socBar", (t.soc != null ? t.soc.toFixed(1) : 0) + "%");
+  setT("vKwhLeft", t.soc != null && S.profile ? `≈ ${(S.profile.kwh * t.soc / 100).toFixed(1)} kWh` : "—");
   const p = (t.packV != null && t.packI != null) ? t.packV * t.packI / 1000 : null;
-  $("vPower").textContent = p == null ? "—" : Math.abs(p).toFixed(2);
-  // continuous colour from smoothed power: neutral -> light red (discharge)
-  // or -> light blue (charge/regen), saturating by |power| so hard regen reads fully blue
-  $("vPower").style.color = powerColor(S.powerEma);
-  $("vCurr").textContent = t.packI == null ? "—" : Math.abs(t.packI).toFixed(1);
-  $("vPackV").textContent = fmt(t.packV, 1);
-  $("vMaxV").textContent = t.maxV == null ? "—" : (t.maxV / 1000).toFixed(3);
-  $("vMinV").textContent = t.minV == null ? "—" : (t.minV / 1000).toFixed(3);
-  $("vMaxN").textContent = "cell #" + (t.maxN ?? "—");
-  $("vMinN").textContent = "cell #" + (t.minN ?? "—");
-  $("vDelta").textContent = d == null ? "—" : Math.round(d);
-  $("vDelta").style.color = d == null ? "var(--sec)" : d > 100 ? "var(--crit)" : d > 40 ? "var(--warn)" : "var(--good)";
-  $("deltaBar").style.width = Math.min(100, (d || 0)) + "%";
-  $("deltaBar").style.background = $("vDelta").style.color;
-  // native balance indicator — raw value until state meanings are mapped
-  $("vBal").textContent = "Balance: " + (t.bal == null ? "—" :
-    `raw ${t.bal} · 0x${Math.round(t.bal).toString(16).padStart(2, "0").toUpperCase()}`);
+  setT("vPower", p == null ? "—" : Math.abs(p).toFixed(2));
+  setCol("vPower", powerColor(S.powerEma));   // colour carries charge/discharge; EMA keeps it organic
+  setT("vCurr", t.packI == null ? "—" : Math.abs(t.packI).toFixed(1));
+  setT("vPackV", fmt(t.packV, 1));
+  setT("vMaxV", t.maxV == null ? "—" : (t.maxV / 1000).toFixed(3));
+  setT("vMinV", t.minV == null ? "—" : (t.minV / 1000).toFixed(3));
+  setT("vMaxN", "cell #" + (t.maxN ?? "—"));
+  setT("vMinN", "cell #" + (t.minN ?? "—"));
+  setT("vDelta", d == null ? "—" : String(Math.round(d)));
+  setCol("vDelta", d == null ? "var(--sec)" : d > 100 ? "var(--crit)" : d > 40 ? "var(--warn)" : "var(--good)");
+  setT("vBal", "Balance: " + (t.bal == null ? "—" :
+    `raw ${t.bal} · 0x${Math.round(t.bal).toString(16).padStart(2, "0").toUpperCase()}`));
   const lvS = t.lv == null ? null : lvStatus(t.lv);
-  $("vLv").textContent = fmt(t.lv, 2);
-  $("vLv").style.color = lvS ? lvS.color : "var(--ink)";
-  $("vLvSub").textContent = lvS ? lvS.label : "";
-  $("vMaxT").textContent = fmt(t.maxT, 0); $("vMinT").textContent = fmt(t.minT, 0); $("vAvgT").textContent = fmt(t.avgT, 0);
-  $("vMaxTN").textContent = "probe " + (t.maxTN ?? "—"); $("vMinTN").textContent = "probe " + (t.minTN ?? "—");
-  $("vEOut").textContent = S.session.eOut.toFixed(2);
-  $("vEIn").textContent = S.session.eIn.toFixed(2);
+  setT("vLv", fmt(t.lv, 2));
+  setCol("vLv", lvS ? lvS.color : "var(--ink)");
+  setT("vLvSub", lvS ? lvS.label : "");
+  setT("vMaxT", fmt(t.maxT, 0)); setT("vMinT", fmt(t.minT, 0)); setT("vAvgT", fmt(t.avgT, 0));
+  setT("vMaxTN", "probe " + (t.maxTN ?? "—")); setT("vMinTN", "probe " + (t.minTN ?? "—"));
+  setT("vEOut", S.session.eOut.toFixed(2));
+  setT("vEIn", S.session.eIn.toFixed(2));
   const trip = S.session.odoNow != null && S.session.odoStart != null ? S.session.odoNow - S.session.odoStart : null;
-  $("vTrip").textContent = trip == null ? "—" : trip.toFixed(0);
-  $("vWhKm").textContent = trip ? ((S.session.eOut - S.session.eIn) * 1000 / trip).toFixed(0) : "—";
+  setT("vTrip", trip == null ? "—" : trip.toFixed(0));
+  setT("vWhKm", trip ? ((S.session.eOut - S.session.eIn) * 1000 / trip).toFixed(0) : "—");
   const rng = S.session.range;
   const rr = (k, f) => rng[k] ? `▼${f(rng[k].lo)} ▲${f(rng[k].hi)}` : "";
-  $("vPackR").textContent = rr("packV", v => v.toFixed(1));
-  $("vMaxR").textContent = rr("maxV", v => (v / 1000).toFixed(3));
-  $("vMinR").textContent = rr("minV", v => (v / 1000).toFixed(3));
-  $("vLvR").textContent = rr("lv", v => v.toFixed(2));
-  $("vPowerR").textContent = rr("power", v => v.toFixed(1));
-  $("vCurrR").textContent = rr("curr", v => v.toFixed(1));
-  $("vDeltaR").textContent = rng.delta ? ` mV · session ▼${Math.round(rng.delta.lo)} ▲${Math.round(rng.delta.hi)}` : " mV · healthy < 40";
-  $("pollStats").textContent = `${S.reads} reads · ${S.misses} misses`;
-  $("connDot").classList.toggle("on", elm.connected);
-  $("connTxt").textContent = elm.connected ? "Connected" : "Lost";
+  setT("vPackR", rr("packV", v => v.toFixed(1)));
+  setT("vMaxR", rr("maxV", v => (v / 1000).toFixed(3)));
+  setT("vMinR", rr("minV", v => (v / 1000).toFixed(3)));
+  setT("vLvR", rr("lv", v => v.toFixed(2)));
+  setT("vPowerR", rr("power", v => v.toFixed(1)));
+  setT("vCurrR", rr("curr", v => v.toFixed(1)));
+  setT("vDeltaR", rng.delta ? `▼${Math.round(rng.delta.lo)} ▲${Math.round(rng.delta.hi)}` : "");
+  setT("pollStats", `${S.reads} reads · ${S.misses} misses`);
+  if (_tc["conn"] !== elm.connected) {
+    _tc["conn"] = elm.connected;
+    $("connDot").classList.toggle("on", elm.connected);
+    if (elm.connected) setT("connTxt", "Connected");
+  }
 }
-
 
 /* ============================ Views ============================ */
 function show(view) {
@@ -1040,7 +1083,128 @@ function onPowerStateChange() {
 document.addEventListener("pointerdown", () => { if (S.view === "dash") resetDim(); });
 
 /* ============================ Report UI ============================ */
+const DC_COL = { soc: "#4d9fff", amp: "#c792ea", tp: "#f5b73d" };
+
+function showDcReport(r) {
+  const el = $("reportSheet");
+  const hm = ts => new Date(ts).toTimeString().slice(0, 5);
+  const durMin = Math.round((r.end - r.start) / 60000);
+  const chart = buildDcChart(r);
+  el.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <div class="lbl" style="font-size:16px; font-weight:700;">DC fast charge</div>
+        <div class="num" style="font-size:11px; color:var(--mut);">${new Date(r.start).toLocaleDateString(undefined,{weekday:"short"})} ${hm(r.start)} → ${hm(r.end)} · ${durMin} min · ${fmt(r.socStart,0)} → ${fmt(r.socEnd,0)}%</div>
+      </div>
+      <button class="ghost" style="min-height:34px; padding:6px 12px;" onclick="document.getElementById('ovReport').classList.add('hidden')">Close</button>
+    </div>
+    <div class="card" style="padding:14px 16px; border-color:#35507a;">
+      <div style="display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px;">
+        <div><div class="lbl" style="font-size:9.5px; color:var(--mut);">Peak power</div><div class="num" style="font-size:16px; font-weight:600; color:#8fc2ff;">${fmt(r.peakKw,1)} kW</div><div class="num" style="font-size:9.5px; color:var(--mut);">${r.peakSoc != null ? "@ " + r.peakSoc.toFixed(0) + "% SOC" : ""}</div></div>
+        <div><div class="lbl" style="font-size:9.5px; color:var(--mut);">Energy in</div><div class="num" style="font-size:16px; font-weight:600;">${fmt(r.eIn,1)} kWh</div><div class="num" style="font-size:9.5px; color:var(--mut);">${r.avgKw != null ? "avg " + r.avgKw + " kW" : ""}</div></div>
+        <div><div class="lbl" style="font-size:9.5px; color:var(--mut);">Max temp</div><div class="num" style="font-size:16px; font-weight:600;">${fmt(r.tpMax,0)} °C</div><div class="num" style="font-size:9.5px; color:var(--mut);">${r.tpStart != null && r.tpMax != null ? "+" + (r.tpMax - r.tpStart).toFixed(0) + "° rise" : ""}</div></div>
+      </div>
+    </div>
+    <div class="card" style="padding:13px 15px; display:flex; flex-direction:column; gap:4px;">
+      <div style="display:flex; gap:14px; align-items:center;">
+        <span style="display:flex; align-items:center; gap:5px;"><span style="width:8px; height:8px; border-radius:50%; background:${DC_COL.soc};"></span><span class="lbl" style="font-size:9.5px; font-weight:600; color:var(--sec);">SOC</span></span>
+        <span style="display:flex; align-items:center; gap:5px;"><span style="width:8px; height:8px; border-radius:50%; background:${DC_COL.amp};"></span><span class="lbl" style="font-size:9.5px; font-weight:600; color:var(--sec);">Current</span></span>
+        <span style="display:flex; align-items:center; gap:5px;"><span style="width:8px; height:8px; border-radius:50%; background:${DC_COL.tp};"></span><span class="lbl" style="font-size:9.5px; font-weight:600; color:var(--sec);">Avg temp</span></span>
+      </div>
+      <div style="display:flex; justify-content:center; min-height:26px;">
+        <span class="num" id="dcChip" style="font-size:10.5px; background:var(--panel2); border:1px solid var(--border); border-radius:999px; padding:4px 12px;">touch the chart to read values</span>
+      </div>
+      ${chart.svg}
+      <div class="num" style="font-size:9px; color:var(--mut);">Touch or drag to scrub · values snap to the nearest 10 s sample</div>
+    </div>
+    <div class="card" style="padding:12px 15px; display:flex; flex-direction:column; gap:2px;">
+      <div class="rowline"><span>ΔV during session</span><span class="num">${r.dLo != null ? Math.round(r.dLo) + " → " + Math.round(r.dHi) + " mV" : "—"}</span></div>
+      <div class="rowline"><span>Temp</span><span class="num">${r.tpStart != null ? Math.round(r.tpStart) + " → " + fmt(r.tpMax,0) + " °C" : "—"}</span></div>
+      <div class="rowline"><span>${fmt(r.socStart,0)} → ${fmt(r.socEnd,0)}% time</span><span class="num">${durMin} min</span></div>
+    </div>
+    <button class="primary" onclick="exportCsv(${r.id})">Export CSV</button>`;
+  $("ovReport").classList.remove("hidden");
+  wireDcScrub(r, chart);
+}
+
+function buildDcChart(r) {
+  const s = r.samples;
+  const t0 = s[0].t, t1 = Math.max(t0 + 1, s[s.length - 1].t);
+  const X = ts => 34 + (ts - t0) / (t1 - t0) * 288;
+  const span = (arr, pad) => {
+    const v = arr.filter(x => x != null);
+    if (!v.length) return null;
+    let lo = Math.min(...v), hi = Math.max(...v);
+    if (hi - lo < pad) { hi += pad; lo -= pad; }
+    return [lo, hi];
+  };
+  const socs = s.map(x => x.soc), amps = s.map(x => x.i != null ? -x.i : null), tps = s.map(x => x.tp);
+  const sSoc = span(socs, 2), sAmp = span([0, ...amps], 5), sTp = span(tps, 1.5);
+  const Y = (v, sp) => sp && v != null ? 118 - (v - sp[0]) / (sp[1] - sp[0]) * 104 : null;
+  const pts = (arr, sp) => s.map((x, i) => arr[i] != null ? `${X(x.t).toFixed(1)},${Y(arr[i], sp).toFixed(1)}` : null).filter(Boolean).join(" ");
+  const last = s[s.length - 1];
+  const lbl = (x, y, txt, col, anchor) => `<text x="${x}" y="${y}" fill="${col}" font-size="9" text-anchor="${anchor || "start"}" font-family="IBM Plex Mono, monospace">${txt}</text>`;
+  const tickTxt = m => m >= 60 ? Math.floor(m / 60) + "h" + String(Math.round(m % 60)).padStart(2, "0") : Math.round(m) + " min";
+  const durM = (t1 - t0) / 60000;
+  let svg = `<svg id="dcSvg" viewBox="0 0 330 150" width="100%" height="185" style="touch-action:none;">
+    <line x1="34" y1="12" x2="34" y2="118" stroke="#232d40"></line>
+    <line x1="34" y1="118" x2="322" y2="118" stroke="#232d40"></line>
+    <line id="dcX" x1="0" y1="12" x2="0" y2="118" stroke="#5c6b84" stroke-dasharray="3 3" visibility="hidden"></line>
+    <polyline points="${pts(socs, sSoc)}" fill="none" stroke="${DC_COL.soc}" stroke-width="2" stroke-linejoin="round"></polyline>
+    <polyline points="${pts(amps, sAmp)}" fill="none" stroke="${DC_COL.amp}" stroke-width="2" stroke-linejoin="round"></polyline>
+    <polyline points="${pts(tps, sTp)}" fill="none" stroke="${DC_COL.tp}" stroke-width="2" stroke-linejoin="round"></polyline>`;
+  // right-edge end labels, de-collided: collect (y, text, colour), then space them >=11px apart
+  const ends = [];
+  if (last.soc != null) ends.push({ y: Y(last.soc, sSoc), tx: last.soc.toFixed(0) + "%", c: DC_COL.soc });
+  if (last.i != null)   ends.push({ y: Y(-last.i, sAmp),  tx: Math.round(-last.i) + " A", c: DC_COL.amp });
+  if (last.tp != null)  ends.push({ y: Y(last.tp, sTp),   tx: Math.round(last.tp) + " °C", c: DC_COL.tp });
+  ends.sort((a, b) => a.y - b.y);
+  for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 11) ends[i].y = ends[i - 1].y + 11;
+  for (const e of ends) svg += lbl(320, Math.min(116, Math.max(10, e.y)), e.tx, e.c, "end");
+  const ampMax = Math.max(...amps.filter(x => x != null), 0);
+  if (ampMax) svg += lbl(40, 10, Math.round(ampMax) + " A peak", DC_COL.amp);
+  svg += `<circle id="dcP1" r="4" fill="${DC_COL.soc}" stroke="#0b0e13" stroke-width="1.5" visibility="hidden"></circle>
+    <circle id="dcP2" r="4" fill="${DC_COL.amp}" stroke="#0b0e13" stroke-width="1.5" visibility="hidden"></circle>
+    <circle id="dcP3" r="4" fill="${DC_COL.tp}" stroke="#0b0e13" stroke-width="1.5" visibility="hidden"></circle>
+    ${lbl(34, 132, "0", "#5c6b84", "middle")}
+    ${lbl(178, 132, tickTxt(durM / 2), "#5c6b84", "middle")}
+    ${lbl(322, 132, tickTxt(durM), "#5c6b84", "end")}
+  </svg>`;
+  return { svg, t0, t1, X, Y, sSoc, sAmp, sTp };
+}
+
+function wireDcScrub(r, c) {
+  const svg = $("dcSvg");
+  if (!svg) return;
+  const s = r.samples;
+  const move = ev => {
+    const rect = svg.getBoundingClientRect();
+    const vx = (ev.clientX - rect.left) / rect.width * 330;
+    if (vx < 30 || vx > 326) { clear(); return; }
+    const ts = c.t0 + (Math.min(322, Math.max(34, vx)) - 34) / 288 * (c.t1 - c.t0);
+    let best = 0, bd = Infinity;
+    for (let i = 0; i < s.length; i++) { const dd = Math.abs(s[i].t - ts); if (dd < bd) { bd = dd; best = i; } }
+    const p = s[best], x = c.X(p.t).toFixed(1);
+    $("dcX").setAttribute("x1", x); $("dcX").setAttribute("x2", x); $("dcX").setAttribute("visibility", "visible");
+    const put = (id, v, sp) => { const e = $(id);
+      if (v == null) { e.setAttribute("visibility", "hidden"); return; }
+      e.setAttribute("cx", x); e.setAttribute("cy", c.Y(v, sp).toFixed(1)); e.setAttribute("visibility", "visible"); };
+    put("dcP1", p.soc, c.sSoc); put("dcP2", p.i != null ? -p.i : null, c.sAmp); put("dcP3", p.tp, c.sTp);
+    const mins = Math.round((p.t - c.t0) / 60000);
+    $("dcChip").innerHTML = `${mins} min · <span style="color:${DC_COL.soc}">${p.soc != null ? p.soc.toFixed(1) + "%" : "—"}</span> · ` +
+      `<span style="color:${DC_COL.amp}">${p.i != null ? Math.round(-p.i) + " A" : "—"}</span> · ` +
+      `<span style="color:${DC_COL.tp}">${p.tp != null ? Math.round(p.tp) + " °C" : "—"}</span>`;
+  };
+  const clear = () => {
+    for (const id of ["dcX", "dcP1", "dcP2", "dcP3"]) $(id).setAttribute("visibility", "hidden");
+    $("dcChip").textContent = "touch the chart to read values";
+  };
+  svg.addEventListener("pointerdown", ev => { svg.setPointerCapture(ev.pointerId); move(ev); });
+  svg.addEventListener("pointermove", ev => { if (ev.buttons) move(ev); });
+}
+
 function showReport(r) {
+  if (r.type === "dc") return showDcReport(r);
   const el = $("reportSheet");
   const dur = (t) => new Date(t).toTimeString().slice(0, 5);
   const day = (t) => new Date(t).toLocaleDateString(undefined, { weekday: "short" });
@@ -1109,7 +1273,9 @@ function showReport(r) {
 function exportCsv(id) {
   const r = getReports().find(x => x.id === id);
   if (!r) return;
-  const keys = ["t", "soc", "packV", "packI", "maxV", "minV", "maxN", "minN", "delta", "maxT", "minT"];
+  const keys = r.type === "dc"
+    ? ["t", "soc", "i", "v", "tp", "d"]
+    : ["t", "soc", "packV", "packI", "maxV", "minV", "maxN", "minN", "delta", "maxT", "minT"];
   const rows = [keys.join(",")];
   for (const s of r.samples) rows.push(keys.map(k => k === "t" ? new Date(s.t).toISOString() : (s[k] ?? "")).join(","));
   const a = document.createElement("a");
@@ -1125,9 +1291,12 @@ function renderReportsList() {
   for (const r of all) {
     const d = document.createElement("div");
     d.className = "card"; d.style.cssText = "padding:12px 14px; display:flex; justify-content:space-between; align-items:center; cursor:pointer;";
+    const sub = r.type === "dc"
+      ? `DC · ${fmt(r.socStart,0)}→${fmt(r.socEnd,0)}% · peak ${fmt(r.peakKw,1)} kW`
+      : `AC top-up · ${fmt(r.socStart,0)}→${fmt(r.socEnd,0)}% · top ΔV ${r.top && r.top.delta != null ? Math.round(r.top.delta) : "?"} mV`;
     d.innerHTML = `<div>
         <div class="num" style="font-size:13px; font-weight:600;">${new Date(r.start).toLocaleDateString()} · ${new Date(r.start).toTimeString().slice(0,5)}</div>
-        <div class="num" style="font-size:10.5px; color:var(--mut);">${fmt(r.socStart,0)}→${fmt(r.socEnd,0)}% · top ΔV ${r.top && r.top.delta != null ? Math.round(r.top.delta) : "?"} mV</div>
+        <div class="num" style="font-size:10.5px; color:var(--mut);">${sub}</div>
       </div><span style="color:var(--mut);">›</span>`;
     d.onclick = () => { $("ovReports").classList.add("hidden"); showReport(r); };
     list.appendChild(d);
