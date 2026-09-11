@@ -662,7 +662,7 @@ function step(id, state, text) {
 
 async function connectFlow(silent) {
   try {
-    if (!navigator.bluetooth) throw new Error("No Web Bluetooth in this browser. Use Chrome or Edge on Android.");
+    if (!navigator.bluetooth && !window.EvNative) throw new Error("No Web Bluetooth in this browser. Use Chrome or Edge on Android.");
     step("stAdapter", "on", "Reconnecting to saved adapter…");
     const r = await elm.reconnectSilent();
     if (!r.ok) {
