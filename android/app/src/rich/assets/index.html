@@ -90,11 +90,11 @@
     #viewDash > .foot { margin-top: 0; }
     /* row 1: five equal tiles — SOC · charge strip · power · current · pack */
     #socCard, #chgStrip { grid-column: span 4; }
-    .grid3 { display: contents; }
-    .grid3 > .card { grid-column: span 4; }
+    #viewDash > .grid3 { display: contents; }
+    #viewDash > .grid3 > .card { grid-column: span 4; }
     /* not charging: strip gone, four equal tiles */
     #viewDash:has(#chgStrip.hidden) #socCard { grid-column: span 5; }
-    #viewDash:has(#chgStrip.hidden) .grid3 > .card { grid-column: span 5; }
+    #viewDash:has(#chgStrip.hidden) > .grid3 > .card { grid-column: span 5; }
     /* rows 2-3 unchanged pairing */
     #cellsCard, #tempCard, #lvCard, #sessCard { grid-column: span 10; }
     /* compact SOC tile */
