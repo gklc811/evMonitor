@@ -6,3 +6,5 @@ local.properties
 *.iml
 .kotlin/
 build*.log
+keystore.properties
+*.jks
