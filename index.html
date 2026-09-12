@@ -82,6 +82,20 @@
   .rowline { display: flex; justify-content: space-between; font-size: 11.5px; padding: 4px 0; }
   .rowline span:first-child { color: var(--sec); }
 
+  /* ---------- focus mode: every value, bigger; decorations hidden ---------- */
+  body.focus #vPackR, body.focus #vPowerR, body.focus #vCurrR, body.focus #vMaxR, body.focus #vMinR,
+  body.focus #vLvR, body.focus #vMaxTN, body.focus #vMinTN, body.focus #balChip,
+  body.focus #socCard .meter, body.focus #socCard > div:last-child { display: none !important; }
+  body.focus #vSoc { font-size: 54px !important; }
+  body.focus #vSoh { font-size: 30px !important; }
+  body.focus #vPower, body.focus #vCurr, body.focus #vPackV { font-size: 32px !important; }
+  body.focus #vMaxV, body.focus #vMinV, body.focus #vDelta { font-size: 30px !important; }
+  body.focus #vMaxN, body.focus #vMinN { font-size: 13px !important; }
+  body.focus #vMaxT, body.focus #vMinT, body.focus #vAvgT { font-size: 28px !important; }
+  body.focus #vLv { font-size: 24px !important; }
+  body.focus #vEOut, body.focus #vEIn, body.focus #vWhKm, body.focus #vTrip { font-size: 19px !important; }
+  #btnFocus.on { background: var(--accent); color: #0b0e13; border-color: var(--accent); }
+
   /* ---------- landscape / wide layout ---------- */
   @media (orientation: landscape) and (min-width: 560px) {
     body { max-width: 940px; }
@@ -89,21 +103,17 @@
     #viewDash > .hdr, #viewDash > .foot { grid-column: 1 / -1; }
     #viewDash > .foot { margin-top: 0; }
     /* row 1: five equal tiles — SOC · charge strip · power · current · pack */
-    #socCard, #chgStrip { grid-column: span 4; }
+    #socCard { grid-column: span 5; }
     #viewDash > .grid3 { display: contents; }
-    #viewDash > .grid3 > .card { grid-column: span 4; }
-    /* not charging: strip gone, four equal tiles */
-    #viewDash:has(#chgStrip.hidden) #socCard { grid-column: span 5; }
-    #viewDash:has(#chgStrip.hidden) > .grid3 > .card { grid-column: span 5; }
+    #viewDash > .grid3 > .card { grid-column: span 5; }
     /* rows 2-3 unchanged pairing */
     #cellsCard, #tempCard, #lvCard, #sessCard { grid-column: span 10; }
     /* compact SOC tile */
     #socCard { padding: 10px 12px !important; gap: 5px !important; }
     #vSoc { font-size: 26px !important; }
     #vSoh { font-size: 15px !important; }
-    /* strip becomes a tile: dot beside title, link pinned at the bottom */
-    #chgStrip:not(.hidden) { display: grid !important; grid-template-columns: auto 1fr; gap: 4px 8px; align-content: start; }
-    #chgGo { grid-column: 1 / -1; margin-top: auto; }
+    body.focus #vSoc, body.focus #vPower, body.focus #vCurr, body.focus #vPackV { font-size: 38px !important; }
+    body.focus #vSoh { font-size: 16px !important; }
   }
 </style>
 </head>
@@ -182,14 +192,6 @@
     </div>
   </div>
 
-  <div class="card hidden" id="chgStrip" style="padding: 11px 13px; display: flex; align-items: center; gap: 9px; cursor: pointer;">
-    <span id="chgDot" style="width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto;"></span>
-    <div style="flex: 1;">
-      <div class="lbl" style="font-size: 10.5px; font-weight: 600;" id="chgTitle"></div>
-      <div class="num" style="font-size: 9.5px; color: var(--mut);" id="chgSub"></div>
-    </div>
-    <span class="lbl" style="font-size: 10.5px; font-weight: 600; color: var(--sec);" id="chgGo">Live chart ›</span>
-  </div>
 
   <div class="grid3">
     <div class="card" style="padding: 11px 12px; display: flex; flex-direction: column; gap: 3px;">
@@ -215,7 +217,7 @@
   <div class="card" id="cellsCard" style="padding: 13px 16px; display: flex; flex-direction: column; gap: 11px;">
     <div style="display: flex; justify-content: space-between; align-items: center;">
       <div class="lbl tile-lbl" style="font-size: 11px;">Cell voltages</div>
-      <div style="display: flex; align-items: center; gap: 6px; background: var(--panel2); border-radius: 999px; padding: 4px 10px;">
+      <div id="balChip" style="display: flex; align-items: center; gap: 6px; background: var(--panel2); border-radius: 999px; padding: 4px 10px;">
         <span class="lbl" style="font-size: 10px; font-weight: 600; color: var(--sec);" id="vBal">Balance: —</span>
       </div>
     </div>
@@ -291,7 +293,11 @@
     <span class="num" style="font-size: 10px; color: var(--mut);" id="pollStats">—</span>
     <div style="display: flex; gap: 8px;">
       <button class="ghost" style="min-height: 30px; padding: 4px 10px; font-size: 11px;" id="btnPause">Pause</button>
-      <button class="ghost" style="min-height: 30px; padding: 4px 10px; font-size: 11px;" id="btnTools">Tools</button>
+      <span style="display: flex; gap: 8px;">
+      <button class="ghost" style="min-height: 30px; padding: 4px 12px; font-size: 11px;" id="btnFocus">Focus</button>
+      <button class="ghost" style="min-height: 30px; padding: 4px 12px; font-size: 11px; color: #8fc2ff; border-color: rgba(143,194,255,0.4);" id="btnChart">Chart</button>
+      <button class="ghost" style="min-height: 30px; padding: 4px 12px; font-size: 11px;" id="btnTools">Tools</button>
+    </span>
     </div>
   </div>
 </div>
@@ -649,8 +655,8 @@ const S = {
   charging: false, chargeStreak: 0, idleStreak: 0,
   powerState: "idle", pendState: "idle", pendStreak: 0, powerEma: null,
   rec: null,                               // active 95-100% AC recording window
-  chg: null,                               // unified charge-session recorder (AC + DC)
-  sessMode: "default", chargeSince: 0, badDids: {}, pendingReport: null,
+  sess: null, chgm: null,                  // continuous sampler + charge-window meta
+  sessMode: "default", chargeSince: 0, badDids: {}, pendingReport: null, focus: false,
   wakeLock: null, dimTimer: null,
   lastOdoAt: 0, lastSave: 0,
 };
@@ -979,26 +985,33 @@ function tick() {
     if (!S.rec.peak || (s.delta != null && s.delta > S.rec.peak.delta)) S.rec.peak = s;
     if (!S.rec.top || s.soc >= S.rec.top.soc) S.rec.top = s;
   }
-  /* unified charge-session recorder: every charge, adaptive resolution */
+  /* continuous session sampler: drive and charge alike (10 s; slow AC 60 s) */
   const chgKw = pNow != null && pNow < 0 ? -pNow : 0;
-  if (S.charging && !S.chg && now - S.chargeSince >= 60000) {
-    S.chg = { start: now, socStart: t.soc, samples: [], last: 0, peakKw: 0, peakSoc: null,
-              tpStart: (t.avgT ?? t.maxT), tpMax: -999, dLo: null, dHi: null, eInStart: S.session.eIn };
-    logLine("charge session recording (sustained 60 s)", "ok");
+  if (!S.sess && t.soc != null) {
+    S.sess = { start: now, socStart: t.soc, samples: [], last: 0 };
+    logLine("session sampling started", "ok");
   }
-  if (S.chg) {
-    if (chgKw > S.chg.peakKw) { S.chg.peakKw = chgKw; S.chg.peakSoc = t.soc; }
-    const tp = t.avgT ?? t.maxT;
-    if (tp != null && tp > S.chg.tpMax) S.chg.tpMax = tp;
+  /* charge window: arms after 60 s sustained charging (regen-proof) */
+  if (S.charging && !S.chgm && now - S.chargeSince >= 60000) {
+    S.chgm = { t: S.chargeSince, socStart: t.soc, eInStart: S.session.eIn, peakKw: 0, peakSoc: null,
+               tpStart: (t.avgT ?? t.maxT), tpMax: -999, dLo: null, dHi: null };
+    logLine("charge window armed", "ok");
+  }
+  if (S.chgm) {
+    if (chgKw > S.chgm.peakKw) { S.chgm.peakKw = chgKw; S.chgm.peakSoc = t.soc; }
+    const tpm = t.avgT ?? t.maxT;
+    if (tpm != null && tpm > S.chgm.tpMax) S.chgm.tpMax = tpm;
     if (dNow != null) {
-      if (S.chg.dLo == null || dNow < S.chg.dLo) S.chg.dLo = dNow;
-      if (S.chg.dHi == null || dNow > S.chg.dHi) S.chg.dHi = dNow;
+      if (S.chgm.dLo == null || dNow < S.chgm.dLo) S.chgm.dLo = dNow;
+      if (S.chgm.dHi == null || dNow > S.chgm.dHi) S.chgm.dHi = dNow;
     }
-    const iv = chgKw >= 15 ? 10000 : 60000;         // DC: 10 s · slow AC: 60 s
-    if (now - S.chg.last >= iv) {
-      S.chg.last = now;
-      S.chg.samples.push({ t: now, soc: t.soc, i: t.packI, v: t.packV, tp, d: dNow });
-      if (S.chg.samples.length > 720) S.chg.samples.shift();
+  }
+  if (S.sess) {
+    const iv = chgKw >= 15 ? 10000 : (S.charging ? 60000 : 10000);
+    if (now - S.sess.last >= iv) {
+      S.sess.last = now;
+      S.sess.samples.push({ t: now, soc: t.soc, i: t.packI, v: t.packV, tp: (t.avgT ?? t.maxT), d: dNow });
+      if (S.sess.samples.length > 720) S.sess.samples.shift();
       if (S.liveOpen && !document.hidden) renderLive();
     }
   }
@@ -1011,13 +1024,15 @@ function liveDelta() {
 }
 
 function finalizeCharge() {
-  const c = S.chg, w = S.rec;
-  S.chg = null; S.rec = null;
-  if (!c || c.samples.length < 3) return;
-  const last = c.samples[c.samples.length - 1];
-  const durMin = (last.t - c.start) / 60000;
-  const eIn = S.session.eIn - c.eInStart;
-  const socRise = (last.soc != null && c.socStart != null) ? last.soc - c.socStart : 0;
+  const m = S.chgm, w = S.rec;
+  S.chgm = null; S.rec = null;
+  if (!m || !S.sess) return;
+  const samples = S.sess.samples.filter(s => s.t >= m.t);
+  if (samples.length < 3) return;
+  const last = samples[samples.length - 1];
+  const durMin = (last.t - m.t) / 60000;
+  const eIn = S.session.eIn - m.eInStart;
+  const socRise = (last.soc != null && m.socStart != null) ? last.soc - m.socStart : 0;
   // a genuine charge always raises SOC; regen while driving never does
   if (socRise < 0.5) {
     logLine("regen/transient discarded — no net SOC rise (" + socRise.toFixed(1) + "%, " + eIn.toFixed(2) + " kWh)", "info");
@@ -1025,12 +1040,12 @@ function finalizeCharge() {
     return;
   }
   const report = {
-    id: Date.now(), type: "chg", start: c.start, end: last.t,
-    socStart: c.socStart, socEnd: last.soc,
-    peakKw: +c.peakKw.toFixed(1), peakSoc: c.peakSoc,
+    id: Date.now(), type: "chg", start: m.t, end: last.t,
+    socStart: m.socStart, socEnd: last.soc,
+    peakKw: +m.peakKw.toFixed(1), peakSoc: m.peakSoc,
     eIn: +eIn.toFixed(2), avgKw: durMin > 0.5 ? +(eIn * 60 / durMin).toFixed(1) : null,
-    tpStart: c.tpStart, tpMax: c.tpMax > -999 ? c.tpMax : null,
-    dLo: c.dLo, dHi: c.dHi, samples: c.samples,
+    tpStart: m.tpStart, tpMax: m.tpMax > -999 ? m.tpMax : null,
+    dLo: m.dLo, dHi: m.dHi, samples: samples,
     top: w ? w.top : null,                     // present for ANY session that reached 95% — AC or DC
     winExt: w ? w.ext : null,
   };
@@ -1045,6 +1060,79 @@ function finalizeCharge() {
     $("repDot").classList.remove("hidden");
   } else { S.liveOpen = false; showReport(report); }
 }
+
+function openLiveChart() {
+  if (!S.sess) { logLine("no session data yet — connect first", "info"); return; }
+  S.liveOpen = true;
+  renderLive();
+  openSheet($("ovReport"));
+}
+function renderLive() {
+  const c = S.sess;
+  if (!c || !S.liveOpen) return;
+  const el = $("reportSheet");
+  const t = S.t;
+  const p = (t.packV != null && t.packI != null) ? t.packV * t.packI / 1000 : null;
+  const charging = S.charging;
+  const m = S.chgm;
+  const isDc = m != null && m.peakKw >= 20;
+  const badge = charging
+    ? (isDc
+      ? `<span class="lbl" style="font-size:10px; font-weight:700; color:#c792ea; border:1px solid rgba(199,146,234,0.4); background:rgba(199,146,234,0.08); border-radius:999px; padding:4px 10px;">● LIVE · DC${m ? " " + fmt(m.peakKw, 1) + " kW" : ""}</span>`
+      : `<span class="lbl" style="font-size:10px; font-weight:700; color:#8fc2ff; border:1px solid rgba(143,194,255,0.4); background:rgba(143,194,255,0.08); border-radius:999px; padding:4px 10px;">● LIVE · AC${m ? " " + fmt(m.peakKw, 1) + " kW" : ""}</span>`)
+    : (S.powerState === "discharge"
+      ? `<span class="lbl" style="font-size:10px; font-weight:700; color:#f89f9f; border:1px solid rgba(248,159,159,0.4); background:rgba(248,159,159,0.08); border-radius:999px; padding:4px 10px;">● LIVE · DRIVE</span>`
+      : `<span class="lbl" style="font-size:10px; font-weight:700; color:var(--sec); border:1px solid var(--border); background:var(--panel2); border-radius:999px; padding:4px 10px;">● LIVE · IDLE</span>`);
+  /* third stat: ETA to 100% while charging, trip distance otherwise */
+  let third = "—", thirdLbl = charging ? "100% ≈" : "Trip", thirdSub = charging ? "at this rate" : "km";
+  if (charging && c.samples.length >= 2 && t.soc != null) {
+    const a2 = c.samples[0], b2 = c.samples[c.samples.length - 1];
+    const rate = (b2.soc - a2.soc) / Math.max(1, b2.t - a2.t);
+    if (rate > 0) third = new Date(Date.now() + (100 - t.soc) / rate).toTimeString().slice(0, 5);
+  } else if (!charging) {
+    const trip = (S.session.odoNow != null && S.session.odoStart != null) ? S.session.odoNow - S.session.odoStart : null;
+    third = trip == null ? "—" : trip.toFixed(0);
+  }
+  const energyLbl = charging ? "Energy in" : "Energy out";
+  const energyVal = charging ? (S.session.eIn - (m ? m.eInStart : 0)) : S.session.eOut;
+  const rep = { samples: c.samples };
+  const chart = c.samples.length > 2 ? buildDcChart(rep) : null;
+  const mins = Math.round((Date.now() - c.start) / 60000);
+  el.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div class="lbl" style="font-size:16px; font-weight:700;">Session chart</div>
+        ${badge}
+      </div>
+      <button class="ghost" style="min-height:34px; padding:6px 12px;" onclick="closeSheets()">Close</button>
+    </div>
+    <div class="num" style="font-size:11px; color:var(--mut); margin-top:-6px;">started ${new Date(c.start).toTimeString().slice(0, 5)} · ${mins} min · sampling ${charging && !isDc ? "60 s" : "10 s"}</div>
+    <div class="card" style="padding:12px 14px;">
+      <div style="display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px;">
+        <div><div class="lbl" style="font-size:9.5px; color:var(--mut);">Now</div><div class="num" style="font-size:15px; font-weight:600;" id="liveNow">${p != null ? Math.abs(p).toFixed(1) + " kW" : "—"}</div><div class="num" style="font-size:9px; color:var(--mut);" id="liveAmp">${t.packI != null ? Math.abs(t.packI).toFixed(1) + " A" : ""}</div></div>
+        <div><div class="lbl" style="font-size:9.5px; color:var(--mut);">${energyLbl}</div><div class="num" style="font-size:15px; font-weight:600;" id="liveEIn">${energyVal.toFixed(2)} kWh</div><div class="num" style="font-size:9px; color:var(--mut);">so far</div></div>
+        <div><div class="lbl" style="font-size:9.5px; color:var(--mut);">${thirdLbl}</div><div class="num" style="font-size:15px; font-weight:600;" id="liveEta">${third}</div><div class="num" style="font-size:9px; color:var(--mut);">${thirdSub}</div></div>
+      </div>
+    </div>
+    <div class="card" style="padding:13px 15px; display:flex; flex-direction:column; gap:4px;">
+      <div style="display:flex; gap:14px; align-items:center; flex-wrap:wrap;">
+        <span style="display:flex; align-items:center; gap:5px;"><span style="width:8px; height:8px; border-radius:50%; background:${DC_COL.soc};"></span><span class="lbl" style="font-size:9.5px; font-weight:600; color:var(--sec);">SOC</span></span>
+        <span style="display:flex; align-items:center; gap:5px;"><span style="width:8px; height:8px; border-radius:50%; background:${DC_COL.amp};"></span><span class="lbl" style="font-size:9.5px; font-weight:600; color:var(--sec);">Current</span></span>
+        <span style="display:flex; align-items:center; gap:5px;"><span style="width:8px; height:8px; border-radius:50%; background:${DC_COL.tp};"></span><span class="lbl" style="font-size:9.5px; font-weight:600; color:var(--sec);">Avg temp</span></span>
+        <span style="display:flex; align-items:center; gap:5px;"><span style="width:8px; height:8px; border-radius:50%; background:${DC_COL.dv};"></span><span class="lbl" style="font-size:9.5px; font-weight:600; color:var(--sec);">ΔV</span></span>
+      </div>
+      <div style="display:flex; justify-content:center; min-height:26px;">
+        <span class="num" id="dcChip" style="font-size:10.5px; background:var(--panel2); border:1px solid var(--border); border-radius:999px; padding:4px 12px;">touch the chart to read values</span>
+      </div>
+      ${chart ? chart.svg : `<div class="num" style="font-size:11px; color:var(--mut); text-align:center; padding:26px 0;">collecting samples — chart appears after a minute…</div>`}
+      <div class="num" style="font-size:9px; color:var(--mut);">Current is signed: regen rises above the drive line · touch to scrub</div>
+    </div>
+    <div style="margin-top:auto; text-align:center; padding-top:6px;">
+      <span class="num" style="font-size:10px; color:var(--mut);">Charge reports still save automatically when a charger stops</span>
+    </div>`;
+  if (chart) wireDcScrub(rep, chart);
+}
+
 /* sheets share one history entry so the system back button closes them
    instead of leaving the app */
 let sheetOpen = false;
@@ -1060,66 +1148,6 @@ function closeSheets(viaPop) {
 }
 window.closeSheets = closeSheets;
 window.addEventListener("popstate", () => closeSheets(true));
-
-function openLiveChart() {
-  if (!S.chg) return;
-  S.liveOpen = true;
-  renderLive();
-  openSheet($("ovReport"));
-}
-function renderLive() {
-  const c = S.chg;
-  if (!c || !S.liveOpen) return;
-  const el = $("reportSheet");
-  const t = S.t;
-  const p = (t.packV != null && t.packI != null) ? t.packV * t.packI / 1000 : null;
-  const eIn = S.session.eIn - c.eInStart;
-  const isDc = c.peakKw >= 20;
-  const iv = c.peakKw >= 15 ? "10 s" : "60 s";
-  let eta = "—";
-  if (c.samples.length >= 2 && t.soc != null) {
-    const a = c.samples[0], b = c.samples[c.samples.length - 1];
-    const rate = (b.soc - a.soc) / Math.max(1, b.t - a.t);
-    if (rate > 0) eta = new Date(Date.now() + (100 - t.soc) / rate).toTimeString().slice(0, 5);
-  }
-  const rep = { samples: c.samples };
-  const chart = c.samples.length > 2 ? buildDcChart(rep) : null;
-  const badgeCol = isDc ? "#c792ea" : "#8fc2ff";
-  const mins = Math.round((Date.now() - c.start) / 60000);
-  el.innerHTML = `
-    <div style="display:flex; justify-content:space-between; align-items:center;">
-      <div style="display:flex; align-items:center; gap:10px;">
-        <div class="lbl" style="font-size:16px; font-weight:700;">Charge</div>
-        <span class="lbl" style="font-size:10px; font-weight:700; color:${badgeCol}; border:1px solid ${badgeCol}66; background:${badgeCol}14; border-radius:999px; padding:4px 10px;">● LIVE · ${isDc ? "DC" : "AC"} ${fmt(c.peakKw,1)} kW</span>
-      </div>
-      <button class="ghost" style="min-height:34px; padding:6px 12px;" onclick="closeSheets()">Close</button>
-    </div>
-    <div class="num" style="font-size:11px; color:var(--mut); margin-top:-6px;">started ${new Date(c.start).toTimeString().slice(0,5)} · ${mins} min · updates every ${iv}</div>
-    <div class="card" style="padding:12px 14px;">
-      <div style="display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px;">
-        <div><div class="lbl" style="font-size:9.5px; color:var(--mut);">Now</div><div class="num" style="font-size:15px; font-weight:600; color:#8fc2ff;" id="liveNow">${p != null ? Math.abs(p).toFixed(1) + " kW" : "—"}</div><div class="num" style="font-size:9px; color:var(--mut);" id="liveAmp">${t.packI != null ? Math.abs(t.packI).toFixed(1) + " A" : ""}</div></div>
-        <div><div class="lbl" style="font-size:9.5px; color:var(--mut);">Energy in</div><div class="num" style="font-size:15px; font-weight:600;" id="liveEIn">${eIn.toFixed(2)} kWh</div><div class="num" style="font-size:9px; color:var(--mut);">so far</div></div>
-        <div><div class="lbl" style="font-size:9.5px; color:var(--mut);">100% ≈</div><div class="num" style="font-size:15px; font-weight:600;" id="liveEta">${eta}</div><div class="num" style="font-size:9px; color:var(--mut);">at this rate</div></div>
-      </div>
-    </div>
-    <div class="card" style="padding:13px 15px; display:flex; flex-direction:column; gap:4px;">
-      <div style="display:flex; gap:14px; align-items:center; flex-wrap:wrap;">
-        <span style="display:flex; align-items:center; gap:5px;"><span style="width:8px; height:8px; border-radius:50%; background:${DC_COL.soc};"></span><span class="lbl" style="font-size:9.5px; font-weight:600; color:var(--sec);">SOC</span></span>
-        <span style="display:flex; align-items:center; gap:5px;"><span style="width:8px; height:8px; border-radius:50%; background:${DC_COL.amp};"></span><span class="lbl" style="font-size:9.5px; font-weight:600; color:var(--sec);">Current</span></span>
-        <span style="display:flex; align-items:center; gap:5px;"><span style="width:8px; height:8px; border-radius:50%; background:${DC_COL.tp};"></span><span class="lbl" style="font-size:9.5px; font-weight:600; color:var(--sec);">Avg temp</span></span>
-        <span style="display:flex; align-items:center; gap:5px;"><span style="width:8px; height:8px; border-radius:50%; background:${DC_COL.dv};"></span><span class="lbl" style="font-size:9.5px; font-weight:600; color:var(--sec);">ΔV</span></span>
-      </div>
-      <div style="display:flex; justify-content:center; min-height:26px;">
-        <span class="num" id="dcChip" style="font-size:10.5px; background:var(--panel2); border:1px solid var(--border); border-radius:999px; padding:4px 12px;">touch the chart to read values</span>
-      </div>
-      ${chart ? chart.svg : `<div class="num" style="font-size:11px; color:var(--mut); text-align:center; padding:26px 0;">collecting samples — chart appears after a few minutes…</div>`}
-      <div class="num" style="font-size:9px; color:var(--mut);">Chart grows as samples land · touch to scrub</div>
-    </div>
-    <div style="margin-top:auto; text-align:center; padding-top:6px;">
-      <span class="num" style="font-size:10px; color:var(--mut);">Report saves automatically when the charger stops</span>
-    </div>`;
-  if (chart) wireDcScrub(rep, chart);
-}
 
 function getReports() { try { return JSON.parse(store.get("evm_reports")) || []; } catch (e) { return []; } }
 
@@ -1183,35 +1211,12 @@ function render() {
   setT("vLvR", rr("lv", v => v.toFixed(2)));
   setT("vPowerR", rr("power", v => v.toFixed(1)));
   setT("vCurrR", rr("curr", v => v.toFixed(1)));
-  setT("vDeltaR", rng.delta ? `▼${Math.round(rng.delta.lo)} ▲${Math.round(rng.delta.hi)}` : "");
-  /* charging strip */
-  const strip = $("chgStrip");
-  if (S.charging) {
-    strip.classList.remove("hidden");
-    if (S.chg) {
-      const mins = Math.round((Date.now() - S.chg.start) / 60000);
-      const eInLive = S.session.eIn - S.chg.eInStart;
-      $("chgDot").style.background = "#8fc2ff"; $("chgDot").style.boxShadow = "0 0 7px #8fc2ff";
-      $("chgTitle").style.color = "#8fc2ff";
-      setT("chgTitle", `Recording charge · ${mins} min`);
-      setT("chgSub", `${p != null ? Math.abs(p).toFixed(1) : "—"} kW · ${eInLive.toFixed(2)} kWh in · ${fmt(S.chg.socStart, 0)} → ${fmt(t.soc, 0)}%`);
-      $("chgGo").classList.remove("hidden");
-      strip.style.borderColor = "rgba(143,194,255,0.45)";
-    } else {
-      $("chgDot").style.background = "var(--warn)"; $("chgDot").style.boxShadow = "0 0 7px var(--warn)";
-      $("chgTitle").style.color = "var(--warn)";
-      setT("chgTitle", "Charging detected · arming recorder…");
-      setT("chgSub", "starts after 60 s sustained");
-      $("chgGo").classList.add("hidden");
-      strip.style.borderColor = "var(--border)";
-    }
-  } else strip.classList.add("hidden");
-  if (S._stripShown !== S.charging) { S._stripShown = S.charging; queueFit(); }
+  setT("vDeltaR", S.focus ? "" : (rng.delta ? `▼${Math.round(rng.delta.lo)} ▲${Math.round(rng.delta.hi)}` : ""));
   /* live sheet stat refresh between samples */
-  if (S.liveOpen && S.chg && $("liveNow")) {
+  if (S.liveOpen && S.sess && $("liveNow")) {
     setT("liveNow", p != null ? Math.abs(p).toFixed(1) + " kW" : "—");
     setT("liveAmp", t.packI != null ? Math.abs(t.packI).toFixed(1) + " A" : "");
-    setT("liveEIn", (S.session.eIn - S.chg.eInStart).toFixed(2) + " kWh");
+    setT("liveEIn", (S.charging ? (S.session.eIn - (S.chgm ? S.chgm.eInStart : 0)) : S.session.eOut).toFixed(2) + " kWh");
   }
   setT("pollStats", `${S.reads} reads · ${S.misses} misses`);
   if (_tc["conn"] !== elm.connected) {
@@ -1594,7 +1599,15 @@ $("btnReports").onclick = () => {
   renderReportsList(); openSheet($("ovReports"));
 };
 $("btnReportsClose").onclick = () => closeSheets();
-$("chgStrip").onclick = openLiveChart;
+$("btnChart").onclick = openLiveChart;
+$("btnFocus").onclick = () => {
+  S.focus = !S.focus;
+  document.body.classList.toggle("focus", S.focus);
+  $("btnFocus").classList.toggle("on", S.focus);
+  store.set("evm_focus", S.focus ? "1" : "0");
+  queueFit();
+  render();
+};
 $("btnScan").onclick = scanRange;
 $("btnReadAll").onclick = readAllOnce;
 $("btnDisconnect").onclick = () => { elm.disconnect(); show("connect"); $("ovTools").classList.add("hidden"); };
@@ -1608,13 +1621,18 @@ $("termIn").addEventListener("keydown", e => { if (e.key === "Enter") $("btnSend
     if (lv && Date.now() - lv.t < 10 * 60000) {
       Object.assign(S.session, lv.session || {});
       S.charging = !!lv.charging; S.chargeSince = lv.chargeSince || 0;
-      S.chg = lv.chg || null; S.rec = lv.rec || null;
+      S.sess = lv.sess || null; S.chgm = lv.chgm || null; S.rec = lv.rec || null;
       S.reads = lv.reads || 0; S.misses = lv.misses || 0;
       logLine("session restored after reload — trip/charge stats continue", "ok");
     }
   } catch (e) {}
   // release any inherited orientation lock (older installs had a portrait manifest)
   try { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch (e) {}
+  if (store.get("evm_focus") === "1") {
+    S.focus = true;
+    document.body.classList.add("focus");
+    $("btnFocus").classList.add("on");
+  }
   const saved = store.get("evm_profile");
   const p = PROFILES.find(x => x.id === saved) || PROFILES[0];
   setProfile(p, saved ? "remembered from last session" : "default — connect to auto-detect");
