@@ -1,5 +1,8 @@
 # evMonitor
 
+**[⬇ Download the Android app (v1.0)](https://github.com/gklc811/evMonitor/releases/latest)** — native APK, no Play Store needed. Requires a BLE (Bluetooth 4.0+) ELM327 adapter.
+
+
 Web app that reads live BMS telemetry from EVs over a **Bluetooth LE OBD2 adapter** — no install, runs in Chrome/Edge on Android as a PWA.
 
 Built for the **Tata Punch EV** (works across the Tata EV range; MG and BYD profiles are experimental).
