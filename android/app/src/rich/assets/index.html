@@ -16,7 +16,8 @@
     --accent: #4d9fff; --good: #3fd68c; --crit: #f26d6d; --warn: #f5b73d;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-  html, body { height: 100%; overscroll-behavior: none; }
+  html { height: 100%; overscroll-behavior: none; }
+  body { height: 100dvh; overflow: hidden; overscroll-behavior: none; }
   body {
     background: var(--bg); color: var(--ink);
     font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
@@ -40,7 +41,7 @@
     border-radius: 8px; padding: 10px; font-family: inherit; font-size: 14px; min-height: 44px;
   }
   .hidden { display: none !important; }
-  #viewDash { transition: opacity 1.6s, transform 3s ease-in-out; }
+  #viewDash { transition: opacity 1.6s, transform 0.8s ease-in-out; }
   #vPower { transition: color 0.8s ease; }
   body.dim { background: #000; }
   body.dim #viewDash { opacity: 0.28; }
@@ -84,9 +85,25 @@
   /* ---------- landscape / wide layout ---------- */
   @media (orientation: landscape) and (min-width: 560px) {
     body { max-width: 940px; }
-    #viewDash { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; align-content: start; }
+    #viewDash { display: grid; grid-template-columns: repeat(20, minmax(0, 1fr)); gap: 8px; align-content: start; }
     #viewDash > .hdr, #viewDash > .foot { grid-column: 1 / -1; }
-    #viewDash > .foot { margin-top: 4px; }
+    #viewDash > .foot { margin-top: 0; }
+    /* row 1: five equal tiles — SOC · charge strip · power · current · pack */
+    #socCard, #chgStrip { grid-column: span 4; }
+    .grid3 { display: contents; }
+    .grid3 > .card { grid-column: span 4; }
+    /* not charging: strip gone, four equal tiles */
+    #viewDash:has(#chgStrip.hidden) #socCard { grid-column: span 5; }
+    #viewDash:has(#chgStrip.hidden) .grid3 > .card { grid-column: span 5; }
+    /* rows 2-3 unchanged pairing */
+    #cellsCard, #tempCard, #lvCard, #sessCard { grid-column: span 10; }
+    /* compact SOC tile */
+    #socCard { padding: 10px 12px !important; gap: 5px !important; }
+    #vSoc { font-size: 26px !important; }
+    #vSoh { font-size: 15px !important; }
+    /* strip becomes a tile: dot beside title, link pinned at the bottom */
+    #chgStrip:not(.hidden) { display: grid !important; grid-template-columns: auto 1fr; gap: 4px 8px; align-content: start; }
+    #chgGo { grid-column: 1 / -1; margin-top: auto; }
   }
 </style>
 </head>
@@ -141,7 +158,7 @@
     </div>
   </div>
 
-  <div class="card" style="padding: 15px 16px 13px; display: flex; flex-direction: column; gap: 10px;">
+  <div class="card" id="socCard" style="padding: 15px 16px 13px; display: flex; flex-direction: column; gap: 10px;">
     <div style="display: flex; justify-content: space-between; align-items: flex-end;">
       <div>
         <div class="lbl tile-lbl">State of charge</div>
@@ -195,7 +212,7 @@
     </div>
   </div>
 
-  <div class="card" style="padding: 13px 16px; display: flex; flex-direction: column; gap: 11px;">
+  <div class="card" id="cellsCard" style="padding: 13px 16px; display: flex; flex-direction: column; gap: 11px;">
     <div style="display: flex; justify-content: space-between; align-items: center;">
       <div class="lbl tile-lbl" style="font-size: 11px;">Cell voltages</div>
       <div style="display: flex; align-items: center; gap: 6px; background: var(--panel2); border-radius: 999px; padding: 4px 10px;">
@@ -233,7 +250,7 @@
     </div>
   </div>
 
-  <div class="card" style="padding: 13px 16px; display: flex; flex-direction: column; gap: 9px;">
+  <div class="card" id="tempCard" style="padding: 13px 16px; display: flex; flex-direction: column; gap: 9px;">
     <div class="lbl tile-lbl" style="font-size: 11px;">Battery temperature</div>
     <div class="grid3">
       <div>
@@ -253,7 +270,7 @@
     </div>
   </div>
 
-  <div class="card" style="padding: 11px 14px; display: flex; justify-content: space-between; align-items: center;">
+  <div class="card" id="lvCard" style="padding: 11px 14px; display: flex; justify-content: space-between; align-items: center;">
     <div class="lbl tile-lbl" style="font-size: 11px;">12V battery</div>
     <div style="display: flex; align-items: baseline; gap: 6px;">
       <span class="num" style="font-size: 20px; font-weight: 600;" id="vLv">—</span>
@@ -263,7 +280,7 @@
     </div>
   </div>
 
-  <div class="card" style="padding: 10px 14px; display: flex; justify-content: space-between; align-items: center;">
+  <div class="card" id="sessCard" style="padding: 10px 14px; display: flex; justify-content: space-between; align-items: center;">
     <div><div class="lbl" style="font-size: 9.5px; color: var(--mut);">Session out</div><span class="num" style="font-size: 14px; font-weight: 600;" id="vEOut">—</span><span class="num" style="font-size: 10px; color: var(--sec);"> kWh</span></div>
     <div><div class="lbl" style="font-size: 9.5px; color: var(--mut);">In</div><span class="num" style="font-size: 14px; font-weight: 600;" id="vEIn">—</span><span class="num" style="font-size: 10px; color: var(--sec);"> kWh</span></div>
     <div><div class="lbl" style="font-size: 9.5px; color: var(--mut);">Efficiency</div><span class="num" style="font-size: 14px; font-weight: 600;" id="vWhKm">—</span><span class="num" style="font-size: 10px; color: var(--sec);"> Wh/km</span></div>
@@ -1189,6 +1206,7 @@ function render() {
       strip.style.borderColor = "var(--border)";
     }
   } else strip.classList.add("hidden");
+  if (S._stripShown !== S.charging) { S._stripShown = S.charging; queueFit(); }
   /* live sheet stat refresh between samples */
   if (S.liveOpen && S.chg && $("liveNow")) {
     setT("liveNow", p != null ? Math.abs(p).toFixed(1) + " kW" : "—");
@@ -1211,6 +1229,7 @@ function show(view) {
 }
 function startMonitoring() {
   show("dash");
+  queueFit();
   acquireWake();
   resetDim();
   if (!S.polling) pollLoop();
@@ -1233,18 +1252,41 @@ document.addEventListener("visibilitychange", () => {
 /* passive dim after 30 s idle — same screen, tap to brighten.
    While dimmed, the whole panel drifts a few px on a slow random walk
    (OLED pixel-shift) so no glyph parks on the same pixels overnight. */
+/* fit-to-viewport: the panel scales down (never scrolls, never clips) when the
+   layout is taller than the screen — portrait and landscape alike */
+let fitScale = 1;
+function fitViewport() {
+  const v = $("viewDash");
+  if (v.classList.contains("hidden")) return;
+  v.style.transform = ""; v.style.width = ""; v.style.marginLeft = "";
+  const cs = getComputedStyle(document.body);
+  const avail = window.innerHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+  const need = v.scrollHeight;
+  fitScale = Math.min(1, avail / Math.max(1, need));
+  if (fitScale < 0.995) {
+    v.style.transformOrigin = "top center";
+    v.style.transform = `scale(${fitScale})`;
+    v.style.width = (100 / fitScale) + "%";
+    v.style.marginLeft = ((100 - 100 / fitScale) / 2) + "%";
+  } else fitScale = 1;
+}
+let fitTimer = null;
+function queueFit() { clearTimeout(fitTimer); fitTimer = setTimeout(fitViewport, 120); }
+window.addEventListener("resize", queueFit);
+window.addEventListener("orientationchange", queueFit);
+
 let dimTimer = null, shiftTimer = null;
 function startPixelShift() {
   stopPixelShift();
   shiftTimer = setInterval(() => {
     const x = Math.round(Math.random() * 16 - 8);
     const y = Math.round(Math.random() * 16 - 8);
-    $("viewDash").style.transform = `translate(${x}px, ${y}px)`;
+    $("viewDash").style.transform = `translate(${x}px, ${y}px)` + (fitScale < 1 ? ` scale(${fitScale})` : "");
   }, 45000);
 }
 function stopPixelShift() {
   if (shiftTimer) { clearInterval(shiftTimer); shiftTimer = null; }
-  $("viewDash").style.transform = "";
+  $("viewDash").style.transform = fitScale < 1 ? `scale(${fitScale})` : "";
 }
 /* Option A: never dim while discharging (driving); dim while charging or idle */
 function dimAllowed() { return S.powerState !== "discharge"; }
