@@ -85,6 +85,10 @@ object Engine {
     private var reads = 0L
     private var misses = 0L
     private var sessMode = "default"
+    /* current ($3401) decode self-calibration: offset-binary raw can never be
+       >32767 or <1000; seeing either proves gen-1 two's-complement encoding */
+    private var iSigned = false
+    private var iSeen = 0
     private var userDisconnect = false
     /* raw transport mode (rich flavor): the WebView UI drives the ELM/UDS protocol */
     private var rawMode = false
@@ -283,6 +287,10 @@ object Engine {
         if (hex.length < e.bytes * 2) return null
         var raw = 0L
         for (i in 0 until e.bytes) raw = (raw shl 8) or hex.substring(i * 2, i * 2 + 2).toLong(16)
+        if (e.did == "3401") {
+            if (!iSigned && iSeen < 12) { iSeen++; if (raw > 32767 || raw < 1000) iSigned = true }
+            return if (iSigned) (if (raw > 32767) raw - 65536 else raw) * 0.1 else raw * 0.1 - 320.0
+        }
         var v = raw * e.f + e.o
         if (e.sanity500 && v > 500) v = raw * 0.01
         return v

@@ -593,11 +593,37 @@ function udsPayload(resp, sid, id) {
   for (let j = 0; j + 1 < hex.length; j += 2) bytes.push(parseInt(hex.substr(j, 2), 16));
   return bytes;
 }
-function decodeEntry(e, bytes) {
+/* Current ($3401) decode self-calibration.
+   Gen-2 packs (Punch): offset-binary — raw*0.1 − 320, idle raw ≈ 3200.
+   Some gen-1 packs (Tigor/Tiago): two's-complement signed — idle raw ≈ 0,
+   regen raw > 32767. Offset-binary raw can never legitimately be > 32767
+   (that would be +2950 A) or sit below ~1000 (−220 A sustained), so either
+   observation proves the signed encoding. Verdict is logged and remembered
+   per vehicle profile. */
+function decodeCurrent(raw) {
+  if (S.iVar == null) {
+    S.iRawSeen = (S.iRawSeen || 0) + 1;
+    if (S.iRawSeen <= 3) logLine("packI raw sample: 0x" + raw.toString(16).toUpperCase().padStart(4, "0") + " (calibrating decode)", "info");
+    if (raw > 32767 || raw < 1000) {
+      S.iVar = "signed";
+    } else if (S.iRawSeen >= 12) {
+      S.iVar = "offset";
+    }
+    if (S.iVar) {
+      store.set("evm_ivar_" + (S.profile ? S.profile.id : "x"), S.iVar);
+      logLine("current decode calibrated: " + S.iVar + (S.iVar === "signed" ? " (gen-1 style)" : " (gen-2 style)"), "ok");
+    }
+  }
+  if (S.iVar === "signed") return (raw > 32767 ? raw - 65536 : raw) * 0.1;
+  return raw * 0.1 - 320;
+}
+
+function decodeEntry(e, bytes, key) {
   if (!bytes || bytes.length < e.bytes) return null;
   let raw = 0;
   if (e.le) { for (let i = e.bytes - 1; i >= 0; i--) raw = (raw << 8) | bytes[i]; }
   else      { for (let i = 0; i < e.bytes; i++)      raw = (raw << 8) | bytes[i]; }
+  if (key === "packI" && e.did === "3401") return decodeCurrent(raw);
   let v = raw * e.f + e.o;
   if (e.sanity500 && v > 500) v = raw * 0.01;   // scaling ambiguity guard for pack voltage
   return v;
@@ -767,6 +793,8 @@ function vinFrom(bytes) {
 }
 function setProfile(prof, how) {
   S.profile = prof;
+  S.iVar = store.get("evm_ivar_" + prof.id) || null;   // per-vehicle current decode
+  S.iRawSeen = 0;
   store.set("evm_profile", prof.id);
   $("selProfile").value = prof.id;
   $("detCard").classList.remove("hidden");
@@ -846,7 +874,7 @@ async function readKey(key) {
     return null;
   }
   S.reads++;
-  const v = decodeEntry(e, bytes);
+  const v = decodeEntry(e, bytes, key);
   if (v !== null) S.t[key] = v;
   return v;
 }
@@ -878,7 +906,7 @@ async function readBatch(keys) {
       const bytes = [];
       for (let j = 0; j < e.bytes; j++) bytes.push(parseInt(flat.substr(p + j * 2, 2), 16));
       p += e.bytes * 2;
-      const v = decodeEntry(e, bytes);
+      const v = decodeEntry(e, bytes, key);
       if (v !== null) { S.t[key] = v; S.reads++; ok = true; }
     }
   }
@@ -1007,7 +1035,7 @@ function tick() {
     }
   }
   if (S.sess) {
-    const iv = chgKw >= 15 ? 10000 : (S.charging ? 60000 : 10000);
+    const iv = chgKw >= 15 ? 10000 : (S.charging ? 60000 : 20000);   // DC 10 s · slow AC 60 s · drive 20 s (~4 h window)
     if (now - S.sess.last >= iv) {
       S.sess.last = now;
       S.sess.samples.push({ t: now, soc: t.soc, i: t.packI, v: t.packV, tp: (t.avgT ?? t.maxT), d: dNow });
@@ -1106,7 +1134,7 @@ function renderLive() {
       </div>
       <button class="ghost" style="min-height:34px; padding:6px 12px;" onclick="closeSheets()">Close</button>
     </div>
-    <div class="num" style="font-size:11px; color:var(--mut); margin-top:-6px;">started ${new Date(c.start).toTimeString().slice(0, 5)} · ${mins} min · sampling ${charging && !isDc ? "60 s" : "10 s"}</div>
+    <div class="num" style="font-size:11px; color:var(--mut); margin-top:-6px;">started ${new Date(c.start).toTimeString().slice(0, 5)} · ${mins} min · sampling ${charging ? (isDc ? "10 s" : "60 s") : "20 s"}</div>
     <div class="card" style="padding:12px 14px;">
       <div style="display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px;">
         <div><div class="lbl" style="font-size:9.5px; color:var(--mut);">Now</div><div class="num" style="font-size:15px; font-weight:600;" id="liveNow">${p != null ? Math.abs(p).toFixed(1) + " kW" : "—"}</div><div class="num" style="font-size:9px; color:var(--mut);" id="liveAmp">${t.packI != null ? Math.abs(t.packI).toFixed(1) + " A" : ""}</div></div>
