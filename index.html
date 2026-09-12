@@ -165,6 +165,15 @@
     </div>
   </div>
 
+  <div class="card hidden" id="chgStrip" style="padding: 11px 13px; display: flex; align-items: center; gap: 9px; cursor: pointer;">
+    <span id="chgDot" style="width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto;"></span>
+    <div style="flex: 1;">
+      <div class="lbl" style="font-size: 10.5px; font-weight: 600;" id="chgTitle"></div>
+      <div class="num" style="font-size: 9.5px; color: var(--mut);" id="chgSub"></div>
+    </div>
+    <span class="lbl" style="font-size: 10.5px; font-weight: 600; color: var(--sec);" id="chgGo">Live chart ›</span>
+  </div>
+
   <div class="grid3">
     <div class="card" style="padding: 11px 12px; display: flex; flex-direction: column; gap: 3px;">
       <div class="lbl tile-lbl">Power</div>
@@ -973,6 +982,7 @@ function tick() {
       S.chg.last = now;
       S.chg.samples.push({ t: now, soc: t.soc, i: t.packI, v: t.packV, tp, d: dNow });
       if (S.chg.samples.length > 720) S.chg.samples.shift();
+      if (S.liveOpen && !document.hidden) renderLive();
     }
   }
 }
@@ -992,7 +1002,11 @@ function finalizeCharge() {
   const eIn = S.session.eIn - c.eInStart;
   const socRise = (last.soc != null && c.socStart != null) ? last.soc - c.socStart : 0;
   // a genuine charge always raises SOC; regen while driving never does
-  if (socRise < 0.5) { logLine("regen/transient discarded — no net SOC rise (" + socRise.toFixed(1) + "%, " + eIn.toFixed(2) + " kWh)", "info"); return; }
+  if (socRise < 0.5) {
+    logLine("regen/transient discarded — no net SOC rise (" + socRise.toFixed(1) + "%, " + eIn.toFixed(2) + " kWh)", "info");
+    if (S.liveOpen) closeSheets();
+    return;
+  }
   const report = {
     id: Date.now(), type: "chg", start: c.start, end: last.t,
     socStart: c.socStart, socEnd: last.soc,
@@ -1009,10 +1023,87 @@ function finalizeCharge() {
   logLine("charge report saved — " + (report.peakKw >= 20 ? "DC" : "AC") + " peak " + report.peakKw + " kW" +
     (report.top && report.top.delta != null ? " · top ΔV " + Math.round(report.top.delta) + " mV" : ""), "ok");
   if (S.powerState === "discharge") {           // driving: badge it, never pop a sheet over the road
+    if (S.liveOpen) closeSheets();
     S.pendingReport = report.id;
     $("repDot").classList.remove("hidden");
-  } else showReport(report);
+  } else { S.liveOpen = false; showReport(report); }
 }
+/* sheets share one history entry so the system back button closes them
+   instead of leaving the app */
+let sheetOpen = false;
+function openSheet(ov) {
+  ov.classList.remove("hidden");
+  if (!sheetOpen) { sheetOpen = true; try { history.pushState({ evm: 1 }, ""); } catch (e) {} }
+}
+function closeSheets(viaPop) {
+  for (const id of ["ovReport", "ovTools", "ovReports"]) $(id).classList.add("hidden");
+  S.liveOpen = false;
+  if (sheetOpen && !viaPop) { sheetOpen = false; try { history.back(); } catch (e) {} }
+  else sheetOpen = false;
+}
+window.closeSheets = closeSheets;
+window.addEventListener("popstate", () => closeSheets(true));
+
+function openLiveChart() {
+  if (!S.chg) return;
+  S.liveOpen = true;
+  renderLive();
+  openSheet($("ovReport"));
+}
+function renderLive() {
+  const c = S.chg;
+  if (!c || !S.liveOpen) return;
+  const el = $("reportSheet");
+  const t = S.t;
+  const p = (t.packV != null && t.packI != null) ? t.packV * t.packI / 1000 : null;
+  const eIn = S.session.eIn - c.eInStart;
+  const isDc = c.peakKw >= 20;
+  const iv = c.peakKw >= 15 ? "10 s" : "60 s";
+  let eta = "—";
+  if (c.samples.length >= 2 && t.soc != null) {
+    const a = c.samples[0], b = c.samples[c.samples.length - 1];
+    const rate = (b.soc - a.soc) / Math.max(1, b.t - a.t);
+    if (rate > 0) eta = new Date(Date.now() + (100 - t.soc) / rate).toTimeString().slice(0, 5);
+  }
+  const rep = { samples: c.samples };
+  const chart = c.samples.length > 2 ? buildDcChart(rep) : null;
+  const badgeCol = isDc ? "#c792ea" : "#8fc2ff";
+  const mins = Math.round((Date.now() - c.start) / 60000);
+  el.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div class="lbl" style="font-size:16px; font-weight:700;">Charge</div>
+        <span class="lbl" style="font-size:10px; font-weight:700; color:${badgeCol}; border:1px solid ${badgeCol}66; background:${badgeCol}14; border-radius:999px; padding:4px 10px;">● LIVE · ${isDc ? "DC" : "AC"} ${fmt(c.peakKw,1)} kW</span>
+      </div>
+      <button class="ghost" style="min-height:34px; padding:6px 12px;" onclick="closeSheets()">Close</button>
+    </div>
+    <div class="num" style="font-size:11px; color:var(--mut); margin-top:-6px;">started ${new Date(c.start).toTimeString().slice(0,5)} · ${mins} min · updates every ${iv}</div>
+    <div class="card" style="padding:12px 14px;">
+      <div style="display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px;">
+        <div><div class="lbl" style="font-size:9.5px; color:var(--mut);">Now</div><div class="num" style="font-size:15px; font-weight:600; color:#8fc2ff;" id="liveNow">${p != null ? Math.abs(p).toFixed(1) + " kW" : "—"}</div><div class="num" style="font-size:9px; color:var(--mut);" id="liveAmp">${t.packI != null ? Math.abs(t.packI).toFixed(1) + " A" : ""}</div></div>
+        <div><div class="lbl" style="font-size:9.5px; color:var(--mut);">Energy in</div><div class="num" style="font-size:15px; font-weight:600;" id="liveEIn">${eIn.toFixed(2)} kWh</div><div class="num" style="font-size:9px; color:var(--mut);">so far</div></div>
+        <div><div class="lbl" style="font-size:9.5px; color:var(--mut);">100% ≈</div><div class="num" style="font-size:15px; font-weight:600;" id="liveEta">${eta}</div><div class="num" style="font-size:9px; color:var(--mut);">at this rate</div></div>
+      </div>
+    </div>
+    <div class="card" style="padding:13px 15px; display:flex; flex-direction:column; gap:4px;">
+      <div style="display:flex; gap:14px; align-items:center; flex-wrap:wrap;">
+        <span style="display:flex; align-items:center; gap:5px;"><span style="width:8px; height:8px; border-radius:50%; background:${DC_COL.soc};"></span><span class="lbl" style="font-size:9.5px; font-weight:600; color:var(--sec);">SOC</span></span>
+        <span style="display:flex; align-items:center; gap:5px;"><span style="width:8px; height:8px; border-radius:50%; background:${DC_COL.amp};"></span><span class="lbl" style="font-size:9.5px; font-weight:600; color:var(--sec);">Current</span></span>
+        <span style="display:flex; align-items:center; gap:5px;"><span style="width:8px; height:8px; border-radius:50%; background:${DC_COL.tp};"></span><span class="lbl" style="font-size:9.5px; font-weight:600; color:var(--sec);">Avg temp</span></span>
+        <span style="display:flex; align-items:center; gap:5px;"><span style="width:8px; height:8px; border-radius:50%; background:${DC_COL.dv};"></span><span class="lbl" style="font-size:9.5px; font-weight:600; color:var(--sec);">ΔV</span></span>
+      </div>
+      <div style="display:flex; justify-content:center; min-height:26px;">
+        <span class="num" id="dcChip" style="font-size:10.5px; background:var(--panel2); border:1px solid var(--border); border-radius:999px; padding:4px 12px;">touch the chart to read values</span>
+      </div>
+      ${chart ? chart.svg : `<div class="num" style="font-size:11px; color:var(--mut); text-align:center; padding:26px 0;">collecting samples — chart appears after a few minutes…</div>`}
+      <div class="num" style="font-size:9px; color:var(--mut);">Chart grows as samples land · touch to scrub</div>
+    </div>
+    <div style="margin-top:auto; text-align:center; padding-top:6px;">
+      <span class="num" style="font-size:10px; color:var(--mut);">Report saves automatically when the charger stops</span>
+    </div>`;
+  if (chart) wireDcScrub(rep, chart);
+}
+
 function getReports() { try { return JSON.parse(store.get("evm_reports")) || []; } catch (e) { return []; } }
 
 /* ============================ Rendering ============================ */
@@ -1076,6 +1167,34 @@ function render() {
   setT("vPowerR", rr("power", v => v.toFixed(1)));
   setT("vCurrR", rr("curr", v => v.toFixed(1)));
   setT("vDeltaR", rng.delta ? `▼${Math.round(rng.delta.lo)} ▲${Math.round(rng.delta.hi)}` : "");
+  /* charging strip */
+  const strip = $("chgStrip");
+  if (S.charging) {
+    strip.classList.remove("hidden");
+    if (S.chg) {
+      const mins = Math.round((Date.now() - S.chg.start) / 60000);
+      const eInLive = S.session.eIn - S.chg.eInStart;
+      $("chgDot").style.background = "#8fc2ff"; $("chgDot").style.boxShadow = "0 0 7px #8fc2ff";
+      $("chgTitle").style.color = "#8fc2ff";
+      setT("chgTitle", `Recording charge · ${mins} min`);
+      setT("chgSub", `${p != null ? Math.abs(p).toFixed(1) : "—"} kW · ${eInLive.toFixed(2)} kWh in · ${fmt(S.chg.socStart, 0)} → ${fmt(t.soc, 0)}%`);
+      $("chgGo").classList.remove("hidden");
+      strip.style.borderColor = "rgba(143,194,255,0.45)";
+    } else {
+      $("chgDot").style.background = "var(--warn)"; $("chgDot").style.boxShadow = "0 0 7px var(--warn)";
+      $("chgTitle").style.color = "var(--warn)";
+      setT("chgTitle", "Charging detected · arming recorder…");
+      setT("chgSub", "starts after 60 s sustained");
+      $("chgGo").classList.add("hidden");
+      strip.style.borderColor = "var(--border)";
+    }
+  } else strip.classList.add("hidden");
+  /* live sheet stat refresh between samples */
+  if (S.liveOpen && S.chg && $("liveNow")) {
+    setT("liveNow", p != null ? Math.abs(p).toFixed(1) + " kW" : "—");
+    setT("liveAmp", t.packI != null ? Math.abs(t.packI).toFixed(1) + " A" : "");
+    setT("liveEIn", (S.session.eIn - S.chg.eInStart).toFixed(2) + " kWh");
+  }
   setT("pollStats", `${S.reads} reads · ${S.misses} misses`);
   if (_tc["conn"] !== elm.connected) {
     _tc["conn"] = elm.connected;
@@ -1183,7 +1302,7 @@ function showChargeReport(r) {
         ${badge}
       </div>
       <div>
-      <button class="ghost" style="min-height:34px; padding:6px 12px;" onclick="document.getElementById('ovReport').classList.add('hidden')">Close</button>
+      <button class="ghost" style="min-height:34px; padding:6px 12px;" onclick="closeSheets()">Close</button>
       </div>
     </div>
     <div class="num" style="font-size:11px; color:var(--mut); margin-top:-6px;">${new Date(r.start).toLocaleDateString(undefined,{weekday:"short"})} ${hm(r.start)} → ${hm(r.end)} · ${durMin} min · ${fmt(r.socStart,0)} → ${fmt(r.socEnd,0)}%</div>
@@ -1214,7 +1333,7 @@ function showChargeReport(r) {
       <div class="rowline"><span>${fmt(r.socStart,0)} → ${fmt(r.socEnd,0)}% time</span><span class="num">${durMin} min</span></div>
     </div>
     <button class="primary" onclick="exportCsv(${r.id})">Export CSV</button>`;
-  $("ovReport").classList.remove("hidden");
+  openSheet($("ovReport"));
   if (chart) wireDcScrub(r, chart);
 }
 
@@ -1413,7 +1532,7 @@ $("selProfile").onchange = () => {
 };
 $("btnConnect").onclick = () => connectFlow(false);
 $("btnStart").onclick = startMonitoring;
-$("btnTools").onclick = () => { $("ovTools").classList.remove("hidden"); renderLog(); };
+$("btnTools").onclick = () => { openSheet($("ovTools")); renderLog(); };
 $("btnPause").onclick = async () => {
   if (S.polling) {
     S.polling = false;
@@ -1427,12 +1546,13 @@ $("btnPause").onclick = async () => {
     if (!S.polling) pollLoop();
   }
 };
-$("btnToolsClose").onclick = () => $("ovTools").classList.add("hidden");
+$("btnToolsClose").onclick = () => closeSheets();
 $("btnReports").onclick = () => {
   $("repDot").classList.add("hidden"); S.pendingReport = null;
-  renderReportsList(); $("ovReports").classList.remove("hidden");
+  renderReportsList(); openSheet($("ovReports"));
 };
-$("btnReportsClose").onclick = () => $("ovReports").classList.add("hidden");
+$("btnReportsClose").onclick = () => closeSheets();
+$("chgStrip").onclick = openLiveChart;
 $("btnScan").onclick = scanRange;
 $("btnReadAll").onclick = readAllOnce;
 $("btnDisconnect").onclick = () => { elm.disconnect(); show("connect"); $("ovTools").classList.add("hidden"); };

@@ -47,6 +47,12 @@ class WebActivity : Activity() {
         ensurePermissions { web.loadUrl("file:///android_asset/index.html") }
     }
 
+    @Deprecated("classic back handling is fine here")
+    override fun onBackPressed() {
+        // a sheet pushed a history entry: back closes the sheet, not the app
+        if (web.canGoBack()) web.goBack() else super.onBackPressed()
+    }
+
     override fun onDestroy() {
         Engine.onLinkEvent = null
         super.onDestroy()
