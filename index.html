@@ -941,6 +941,7 @@ async function pollLoop() {
   while (S.polling && elm.connected) {
     for (const b of BATCHES) { if (!S.polling) break; await readBatch(b); render(); }
     await readKey(SLOW_KEYS[slowIdx++ % SLOW_KEYS.length]);
+    if (S.charging) await readKey("bal");   // promote balance read while charging to catch transitions fast
     if (S.sessMode === "extended" && Date.now() - lastTP > 2500) { await elm.send("3E80", 800); lastTP = Date.now(); }
     tick();
     render();
@@ -1056,6 +1057,20 @@ function tick() {
   }
   if (S.chgm) {
     if (chgKw > S.chgm.peakKw) { S.chgm.peakKw = chgKw; S.chgm.peakSoc = t.soc; }
+    /* balancer transitions: each change logged with SOC and both cell extremes */
+    if (t.bal != null) {
+      const b = Math.round(t.bal);
+      if (S.chgm.balLast == null) S.chgm.balLast = b;
+      else if (b !== S.chgm.balLast) {
+        (S.chgm.balEv = S.chgm.balEv || []).push({
+          t: now, soc: t.soc, from: S.chgm.balLast, to: b,
+          maxV: t.maxV, maxN: t.maxN, minV: t.minV, minN: t.minN,
+        });
+        if (S.chgm.balEv.length > 40) S.chgm.balEv.shift();
+        logLine("balancer " + S.chgm.balLast + " → " + b + " @ " + fmt(t.soc, 1) + "%", "ok");
+        S.chgm.balLast = b;
+      }
+    }
     const tpm = t.avgT ?? t.maxT;
     if (tpm != null && tpm > S.chgm.tpMax) S.chgm.tpMax = tpm;
     if (dNow != null) {
@@ -1105,6 +1120,7 @@ function finalizeCharge() {
     dLo: m.dLo, dHi: m.dHi, samples: samples,
     top: w ? w.top : null,                     // present for ANY session that reached 95% — AC or DC
     winExt: w ? w.ext : null,
+    balEv: m.balEv || [],
   };
   const all = getReports(); all.unshift(report);
   while (all.length > 20) all.pop();
@@ -1431,6 +1447,20 @@ function showChargeReport(r) {
       <div class="num" style="font-size:9px; color:var(--mut);">Touch or drag to scrub · values snap to the nearest sample</div>
     </div>
     ${toc}
+    ${(r.balEv && r.balEv.length) ? `
+    <div class="card" style="padding:12px 14px; display:flex; flex-direction:column; gap:6px;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span class="lbl" style="font-size:10px; font-weight:600; color:var(--mut);">Balancer activity · ${r.balEv.length} event${r.balEv.length > 1 ? "s" : ""}</span>
+        <span class="num" style="font-size:9px; color:var(--mut);">sampled every cycle while charging</span>
+      </div>
+      <div class="num" style="display:grid; grid-template-columns:auto auto 1fr; gap:4px 12px; font-size:10.5px;">
+        ${r.balEv.map(e =>
+          `<span style="color:var(--sec);">${e.soc != null ? e.soc.toFixed(1) + "%" : "—"}</span>` +
+          `<span style="color:var(--warn); font-weight:600;">${e.from} → ${e.to}</span>` +
+          `<span style="color:var(--mut);">max ${e.maxV != null ? (e.maxV / 1000).toFixed(3) : "—"} <span style="color:var(--good);">#${e.maxN ?? "—"}</span> · min ${e.minV != null ? (e.minV / 1000).toFixed(3) : "—"} <span style="color:var(--crit);">#${e.minN ?? "—"}</span></span>`
+        ).join("")}
+      </div>
+    </div>` : ""}
     <div class="card" style="padding:12px 15px; display:flex; flex-direction:column; gap:2px;">
       <div class="rowline"><span>ΔV during session</span><span class="num">${r.dLo != null ? Math.round(r.dLo) + " → " + Math.round(r.dHi) + " mV" : "—"}</span></div>
       <div class="rowline"><span>Temp</span><span class="num">${r.tpStart != null ? Math.round(r.tpStart) + " → " + fmt(r.tpMax,0) + " °C" : "—"}</span></div>

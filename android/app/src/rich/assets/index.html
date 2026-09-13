@@ -642,6 +642,7 @@ function installNativeBridge() {
       elm.connected = false; S.polling = false;
       $("connDot").classList.remove("on"); $("connTxt").textContent = "Re-attaching…";
       logLine("link lost — native auto re-attach", "err");        // native autoConnect handles it; no JS retry loop
+      chargeLossWatchdog();
     } else if (ev === "reconnected") {
       elm.connected = true;
       (async () => {
@@ -805,8 +806,20 @@ function setProfile(prof, how) {
   $("dashSub").textContent = `BMS Live · ${prof.hdr}/${prof.rx}`;
   $("vPackSpec").textContent = `${prof.kwh} kWh · ` + (prof.cells ? `${prof.cells}S ${prof.chem.split(" ")[0]}` : prof.chem);
 }
+function chargeLossWatchdog() {
+  if (!S.charging) return;
+  clearTimeout(S.chgLossTimer);
+  S.chgLossTimer = setTimeout(() => {
+    if (!elm.connected && S.charging) {
+      logLine("charge end assumed — link lost while charging (adapter powered down)", "info");
+      S.charging = false;
+      finalizeCharge();
+    }
+  }, 180000);
+}
 function onAdapterLost() {
   S.polling = false;
+  chargeLossWatchdog();
   $("connDot").classList.remove("on"); $("connTxt").textContent = "Reconnecting…";
   logLine("adapter disconnected — auto-reconnect armed", "err");
   scheduleReconnect();
@@ -875,7 +888,7 @@ async function readKey(key) {
   }
   S.reads++;
   const v = decodeEntry(e, bytes, key);
-  if (v !== null) S.t[key] = v;
+  if (v !== null) { S.t[key] = v; if (key === "packI") S.lastIAt = Date.now(); }
   return v;
 }
 
@@ -907,7 +920,7 @@ async function readBatch(keys) {
       for (let j = 0; j < e.bytes; j++) bytes.push(parseInt(flat.substr(p + j * 2, 2), 16));
       p += e.bytes * 2;
       const v = decodeEntry(e, bytes, key);
-      if (v !== null) { S.t[key] = v; S.reads++; ok = true; }
+      if (v !== null) { S.t[key] = v; S.reads++; ok = true; if (key === "packI") S.lastIAt = Date.now(); }
     }
   }
   if (ok) {
@@ -928,6 +941,7 @@ async function pollLoop() {
   while (S.polling && elm.connected) {
     for (const b of BATCHES) { if (!S.polling) break; await readBatch(b); render(); }
     await readKey(SLOW_KEYS[slowIdx++ % SLOW_KEYS.length]);
+    if (S.charging) await readKey("bal");   // promote balance read while charging to catch transitions fast
     if (S.sessMode === "extended" && Date.now() - lastTP > 2500) { await elm.send("3E80", 800); lastTP = Date.now(); }
     tick();
     render();
@@ -970,6 +984,22 @@ function tick() {
     if (t.packI < -0.5) { S.chargeStreak++; S.idleStreak = 0; } else { S.idleStreak++; S.chargeStreak = 0; }
     if (!S.charging && S.chargeStreak >= 3) { S.charging = true; S.chargeSince = now; }
     if (S.charging && S.idleStreak >= 25) { S.charging = false; finalizeCharge(); }
+  }
+  /* full-charge watchdog: at 100% the BMS goes to sleep and reads freeze at the
+     last charging current, so idle is never seen — 2 min of silence IS the end */
+  if (S.charging && S.lastIAt && now - S.lastIAt > 120000) {
+    logLine("charge end assumed — BMS silent for 2 min (car sleeping after full charge)", "info");
+    S.charging = false; S.chargeStreak = 0; S.idleStreak = 0;
+    finalizeCharge();
+  }
+  /* live-state snapshot every 15 s — durable (localStorage), so an interrupted
+     charge can be recovered even after the app process dies overnight */
+  if (now - S.lastSave > 15000) {
+    S.lastSave = now;
+    store.set("evm_live", JSON.stringify({
+      t: now, session: S.session, charging: S.charging, chargeSince: S.chargeSince,
+      sess: S.sess, chgm: S.chgm, rec: S.rec, reads: S.reads, misses: S.misses,
+    }));
   }
   /* power-state machine: charge / discharge / idle, 3-sample dead-band
      so regen blips and stop-and-go never flicker the colour or the dim rule */
@@ -1027,6 +1057,20 @@ function tick() {
   }
   if (S.chgm) {
     if (chgKw > S.chgm.peakKw) { S.chgm.peakKw = chgKw; S.chgm.peakSoc = t.soc; }
+    /* balancer transitions: each change logged with SOC and both cell extremes */
+    if (t.bal != null) {
+      const b = Math.round(t.bal);
+      if (S.chgm.balLast == null) S.chgm.balLast = b;
+      else if (b !== S.chgm.balLast) {
+        (S.chgm.balEv = S.chgm.balEv || []).push({
+          t: now, soc: t.soc, from: S.chgm.balLast, to: b,
+          maxV: t.maxV, maxN: t.maxN, minV: t.minV, minN: t.minN,
+        });
+        if (S.chgm.balEv.length > 40) S.chgm.balEv.shift();
+        logLine("balancer " + S.chgm.balLast + " → " + b + " @ " + fmt(t.soc, 1) + "%", "ok");
+        S.chgm.balLast = b;
+      }
+    }
     const tpm = t.avgT ?? t.maxT;
     if (tpm != null && tpm > S.chgm.tpMax) S.chgm.tpMax = tpm;
     if (dNow != null) {
@@ -1076,6 +1120,7 @@ function finalizeCharge() {
     dLo: m.dLo, dHi: m.dHi, samples: samples,
     top: w ? w.top : null,                     // present for ANY session that reached 95% — AC or DC
     winExt: w ? w.ext : null,
+    balEv: m.balEv || [],
   };
   const all = getReports(); all.unshift(report);
   while (all.length > 20) all.pop();
@@ -1402,6 +1447,20 @@ function showChargeReport(r) {
       <div class="num" style="font-size:9px; color:var(--mut);">Touch or drag to scrub · values snap to the nearest sample</div>
     </div>
     ${toc}
+    ${(r.balEv && r.balEv.length) ? `
+    <div class="card" style="padding:12px 14px; display:flex; flex-direction:column; gap:6px;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span class="lbl" style="font-size:10px; font-weight:600; color:var(--mut);">Balancer activity · ${r.balEv.length} event${r.balEv.length > 1 ? "s" : ""}</span>
+        <span class="num" style="font-size:9px; color:var(--mut);">sampled every cycle while charging</span>
+      </div>
+      <div class="num" style="display:grid; grid-template-columns:auto auto 1fr; gap:4px 12px; font-size:10.5px;">
+        ${r.balEv.map(e =>
+          `<span style="color:var(--sec);">${e.soc != null ? e.soc.toFixed(1) + "%" : "—"}</span>` +
+          `<span style="color:var(--warn); font-weight:600;">${e.from} → ${e.to}</span>` +
+          `<span style="color:var(--mut);">max ${e.maxV != null ? (e.maxV / 1000).toFixed(3) : "—"} <span style="color:var(--good);">#${e.maxN ?? "—"}</span> · min ${e.minV != null ? (e.minV / 1000).toFixed(3) : "—"} <span style="color:var(--crit);">#${e.minN ?? "—"}</span></span>`
+        ).join("")}
+      </div>
+    </div>` : ""}
     <div class="card" style="padding:12px 15px; display:flex; flex-direction:column; gap:2px;">
       <div class="rowline"><span>ΔV during session</span><span class="num">${r.dLo != null ? Math.round(r.dLo) + " → " + Math.round(r.dHi) + " mV" : "—"}</span></div>
       <div class="rowline"><span>Temp</span><span class="num">${r.tpStart != null ? Math.round(r.tpStart) + " → " + fmt(r.tpMax,0) + " °C" : "—"}</span></div>
@@ -1645,13 +1704,25 @@ $("termIn").addEventListener("keydown", e => { if (e.key === "Enter") $("btnSend
 /* restore profile + compat check */
 (function init() {
   try {
-    const lv = JSON.parse(sessionStorage.getItem("evm_live"));
+    const lv = JSON.parse(store.get("evm_live"));
     if (lv && Date.now() - lv.t < 10 * 60000) {
       Object.assign(S.session, lv.session || {});
       S.charging = !!lv.charging; S.chargeSince = lv.chargeSince || 0;
       S.sess = lv.sess || null; S.chgm = lv.chgm || null; S.rec = lv.rec || null;
       S.reads = lv.reads || 0; S.misses = lv.misses || 0;
       logLine("session restored after reload — trip/charge stats continue", "ok");
+    } else if (lv && lv.chgm && lv.sess && lv.sess.samples && lv.sess.samples.length > 2 &&
+               Date.now() - lv.t < 48 * 3600000) {
+      // an armed charge window died with the app (car slept at 100%, process killed
+      // overnight, …) — finalize the report from the snapshot instead of losing it
+      Object.assign(S.session, lv.session || {});
+      S.sess = lv.sess; S.chgm = lv.chgm; S.rec = lv.rec || null;
+      S.powerState = "idle";
+      finalizeCharge();
+      logLine("charge report recovered from interrupted session", "ok");
+      S.sess = null; S.rec = null;
+      S.session = { start: 0, eOut: 0, eIn: 0, lastT: 0, lastP: 0, odoStart: null, odoNow: null, range: {} };
+      store.set("evm_live", "");
     }
   } catch (e) {}
   // release any inherited orientation lock (older installs had a portrait manifest)
