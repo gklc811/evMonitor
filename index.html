@@ -642,6 +642,7 @@ function installNativeBridge() {
       elm.connected = false; S.polling = false;
       $("connDot").classList.remove("on"); $("connTxt").textContent = "Re-attaching…";
       logLine("link lost — native auto re-attach", "err");        // native autoConnect handles it; no JS retry loop
+      chargeLossWatchdog();
     } else if (ev === "reconnected") {
       elm.connected = true;
       (async () => {
@@ -805,8 +806,20 @@ function setProfile(prof, how) {
   $("dashSub").textContent = `BMS Live · ${prof.hdr}/${prof.rx}`;
   $("vPackSpec").textContent = `${prof.kwh} kWh · ` + (prof.cells ? `${prof.cells}S ${prof.chem.split(" ")[0]}` : prof.chem);
 }
+function chargeLossWatchdog() {
+  if (!S.charging) return;
+  clearTimeout(S.chgLossTimer);
+  S.chgLossTimer = setTimeout(() => {
+    if (!elm.connected && S.charging) {
+      logLine("charge end assumed — link lost while charging (adapter powered down)", "info");
+      S.charging = false;
+      finalizeCharge();
+    }
+  }, 180000);
+}
 function onAdapterLost() {
   S.polling = false;
+  chargeLossWatchdog();
   $("connDot").classList.remove("on"); $("connTxt").textContent = "Reconnecting…";
   logLine("adapter disconnected — auto-reconnect armed", "err");
   scheduleReconnect();
@@ -875,7 +888,7 @@ async function readKey(key) {
   }
   S.reads++;
   const v = decodeEntry(e, bytes, key);
-  if (v !== null) S.t[key] = v;
+  if (v !== null) { S.t[key] = v; if (key === "packI") S.lastIAt = Date.now(); }
   return v;
 }
 
@@ -907,7 +920,7 @@ async function readBatch(keys) {
       for (let j = 0; j < e.bytes; j++) bytes.push(parseInt(flat.substr(p + j * 2, 2), 16));
       p += e.bytes * 2;
       const v = decodeEntry(e, bytes, key);
-      if (v !== null) { S.t[key] = v; S.reads++; ok = true; }
+      if (v !== null) { S.t[key] = v; S.reads++; ok = true; if (key === "packI") S.lastIAt = Date.now(); }
     }
   }
   if (ok) {
@@ -970,6 +983,22 @@ function tick() {
     if (t.packI < -0.5) { S.chargeStreak++; S.idleStreak = 0; } else { S.idleStreak++; S.chargeStreak = 0; }
     if (!S.charging && S.chargeStreak >= 3) { S.charging = true; S.chargeSince = now; }
     if (S.charging && S.idleStreak >= 25) { S.charging = false; finalizeCharge(); }
+  }
+  /* full-charge watchdog: at 100% the BMS goes to sleep and reads freeze at the
+     last charging current, so idle is never seen — 2 min of silence IS the end */
+  if (S.charging && S.lastIAt && now - S.lastIAt > 120000) {
+    logLine("charge end assumed — BMS silent for 2 min (car sleeping after full charge)", "info");
+    S.charging = false; S.chargeStreak = 0; S.idleStreak = 0;
+    finalizeCharge();
+  }
+  /* live-state snapshot every 15 s — durable (localStorage), so an interrupted
+     charge can be recovered even after the app process dies overnight */
+  if (now - S.lastSave > 15000) {
+    S.lastSave = now;
+    store.set("evm_live", JSON.stringify({
+      t: now, session: S.session, charging: S.charging, chargeSince: S.chargeSince,
+      sess: S.sess, chgm: S.chgm, rec: S.rec, reads: S.reads, misses: S.misses,
+    }));
   }
   /* power-state machine: charge / discharge / idle, 3-sample dead-band
      so regen blips and stop-and-go never flicker the colour or the dim rule */
@@ -1645,13 +1674,25 @@ $("termIn").addEventListener("keydown", e => { if (e.key === "Enter") $("btnSend
 /* restore profile + compat check */
 (function init() {
   try {
-    const lv = JSON.parse(sessionStorage.getItem("evm_live"));
+    const lv = JSON.parse(store.get("evm_live"));
     if (lv && Date.now() - lv.t < 10 * 60000) {
       Object.assign(S.session, lv.session || {});
       S.charging = !!lv.charging; S.chargeSince = lv.chargeSince || 0;
       S.sess = lv.sess || null; S.chgm = lv.chgm || null; S.rec = lv.rec || null;
       S.reads = lv.reads || 0; S.misses = lv.misses || 0;
       logLine("session restored after reload — trip/charge stats continue", "ok");
+    } else if (lv && lv.chgm && lv.sess && lv.sess.samples && lv.sess.samples.length > 2 &&
+               Date.now() - lv.t < 48 * 3600000) {
+      // an armed charge window died with the app (car slept at 100%, process killed
+      // overnight, …) — finalize the report from the snapshot instead of losing it
+      Object.assign(S.session, lv.session || {});
+      S.sess = lv.sess; S.chgm = lv.chgm; S.rec = lv.rec || null;
+      S.powerState = "idle";
+      finalizeCharge();
+      logLine("charge report recovered from interrupted session", "ok");
+      S.sess = null; S.rec = null;
+      S.session = { start: 0, eOut: 0, eIn: 0, lastT: 0, lastP: 0, odoStart: null, odoNow: null, range: {} };
+      store.set("evm_live", "");
     }
   } catch (e) {}
   // release any inherited orientation lock (older installs had a portrait manifest)
