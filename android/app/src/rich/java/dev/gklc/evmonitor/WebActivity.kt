@@ -73,12 +73,12 @@ class WebActivity : Activity() {
         @JavascriptInterface
         fun connectSaved(id: String) {
             val mac = Engine.savedMac(this@WebActivity)
-            if (mac == null) { resp(id, "no adapter saved — pairing list opening"); runOnUiThread { startScanDialog() }; return }
+            if (mac == null) { resp(id, "no adapter saved — pairing list opening"); runOnUiThread { ensurePermissions { startScanDialog() } }; return }
             Engine.connectRaw(this@WebActivity, mac) { ok -> resp(id, if (ok) "ok" else "adapter not reachable") }
         }
 
         @JavascriptInterface
-        fun openPairing() { runOnUiThread { startScanDialog() } }
+        fun openPairing() { runOnUiThread { ensurePermissions { startScanDialog() } } }
 
         @JavascriptInterface
         fun disconnect() { Engine.disconnect() }
@@ -136,7 +136,9 @@ class WebActivity : Activity() {
             .create()
         dialog.setOnDismissListener { try { scanner.stopScan(cb) } catch (e: Exception) {} }
         dialog.show()
-        scanner.startScan(cb)
+        try { scanner.startScan(cb) } catch (e: SecurityException) {
+            dialog.dismiss(); Toast.makeText(this, "Bluetooth permission needed to find the adapter", Toast.LENGTH_LONG).show(); return
+        }
         Handler(Looper.getMainLooper()).postDelayed({ try { scanner.stopScan(cb) } catch (e: Exception) {} }, 10000)
     }
 

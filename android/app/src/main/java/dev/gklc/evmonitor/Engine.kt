@@ -7,6 +7,7 @@ import android.content.Intent
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.UUID
@@ -77,6 +78,7 @@ object Engine {
     private var gatt: BluetoothGatt? = null
     private var writeChar: BluetoothGattCharacteristic? = null
     private var buf = StringBuilder()
+    private val bufLock = Any()
     private var expect: String? = null
     private var responseWaiter: CancellableContinuation<String>? = null
     private var servicesReady: CancellableContinuation<Boolean>? = null
@@ -89,6 +91,8 @@ object Engine {
        >32767 or <1000; seeing either proves gen-1 two's-complement encoding */
     private var iSigned = false
     private var iSeen = 0
+    private var iLow = 0
+    private var iDecided = false
     private var userDisconnect = false
     /* raw transport mode (rich flavor): the WebView UI drives the ELM/UDS protocol */
     private var rawMode = false
@@ -119,6 +123,8 @@ object Engine {
                     if (ctx != null && dev != null) {
                         scope.launch {
                             delay(300)
+                            // fenced: a manual connect/disconnect in the meantime owns the link now
+                            if (userDisconnect || gatt !== g) return@launch
                             try { g.close() } catch (e: Exception) {}
                             gatt = dev.connectGatt(ctx, true, gattCb, BluetoothDevice.TRANSPORT_LE)
                         }
@@ -128,17 +134,21 @@ object Engine {
         }
         override fun onMtuChanged(g: BluetoothGatt, mtu: Int, status: Int) { g.discoverServices() }
         override fun onServicesDiscovered(g: BluetoothGatt, status: Int) {
-            val waiter = servicesReady
-            if (waiter != null) { servicesReady = null; waiter.resume(status == BluetoothGatt.GATT_SUCCESS) }
-            else if (status == BluetoothGatt.GATT_SUCCESS) scope.launch { startSession() }   // auto re-attach path
+            val waiter = servicesReady; servicesReady = null
+            val ok = status == BluetoothGatt.GATT_SUCCESS
+            if (waiter != null && waiter.isActive) waiter.resume(ok)
+            else if (ok) scope.launch { startSession() }   // auto re-attach path (or a waiter that already timed out)
         }
-        override fun onDescriptorWrite(g: BluetoothGatt, d: BluetoothGattDescriptor, status: Int) { descriptorDone?.resume(status == BluetoothGatt.GATT_SUCCESS); descriptorDone = null }
+        override fun onDescriptorWrite(g: BluetoothGatt, d: BluetoothGattDescriptor, status: Int) {
+            val k = descriptorDone; descriptorDone = null                 // clear first, then resume
+            if (k != null && k.isActive) k.resume(status == BluetoothGatt.GATT_SUCCESS)
+        }
         @Deprecated("pre-33 callback")
         override fun onCharacteristicChanged(g: BluetoothGatt, c: BluetoothGattCharacteristic) { onChunk(c.value ?: return) }
         override fun onCharacteristicChanged(g: BluetoothGatt, c: BluetoothGattCharacteristic, value: ByteArray) { onChunk(value) }
     }
 
-    private fun onChunk(bytes: ByteArray) {
+    private fun onChunk(bytes: ByteArray) = synchronized(bufLock) {
         buf.append(String(bytes, Charsets.ISO_8859_1))
         // segment parsing with stale-response rejection (same fix as the web app)
         while (true) {
@@ -147,6 +157,7 @@ object Engine {
             val seg = buf.substring(0, i + 1)
             buf.delete(0, i + 1)
             val w = responseWaiter ?: continue
+            if (!w.isActive) { responseWaiter = null; continue }
             val exp = expect
             if (exp != null) {
                 val flat = seg.uppercase().replace(Regex("[^0-9A-F]"), "")
@@ -160,18 +171,20 @@ object Engine {
     }
 
     fun connectRaw(ctx: Context, mac: String, cb: (Boolean) -> Unit) {
-        rawMode = true
         transportReadyCb = cb
-        connect(ctx, mac)
+        connect(ctx, mac, raw = true)
     }
 
-    fun connect(ctx: Context, mac: String) {
+    fun connect(ctx: Context, mac: String, raw: Boolean = false) {
         app = ctx.applicationContext
         prefs(ctx).edit().putString("mac", mac).apply()
         userDisconnect = false
+        rawMode = raw                                   // the caller decides who drives the protocol
+        pollJob?.cancel()                               // an old loop must not interleave with the new link's init
+        servicesReady = null
         scope.launch {
             try {
-                update { it.copy(status = "Connecting…") }
+                update { it.copy(connected = false, status = "Connecting…") }
                 val adapter = (ctx.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter
                 val dev = adapter.getRemoteDevice(mac)
                 device = dev
@@ -180,6 +193,7 @@ object Engine {
                 val ok = withTimeoutOrNull(20000) {
                     suspendCancellableCoroutine { c -> servicesReady = c }
                 } ?: false
+                servicesReady = null                    // a timed-out waiter must not swallow the next discovery
                 if (!ok) {
                     update { it.copy(status = "Adapter not reachable") }
                     transportReadyCb?.invoke(false); transportReadyCb = null
@@ -251,16 +265,25 @@ object Engine {
         val g = gatt ?: return false
         if (!g.setCharacteristicNotification(c, true)) return false
         val d = c.getDescriptor(CCCD) ?: return true
-        @Suppress("DEPRECATION")
-        run { d.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE; g.writeDescriptor(d) }
-        return withTimeoutOrNull(4000) { suspendCancellableCoroutine { k -> descriptorDone = k } } ?: false
+        val ok = withTimeoutOrNull(4000) {
+            suspendCancellableCoroutine { k ->
+                descriptorDone = k                      // waiter first, then the write
+                @Suppress("DEPRECATION")
+                run {
+                    d.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+                    if (!g.writeDescriptor(d)) { descriptorDone = null; k.resume(false) }
+                }
+            }
+        } ?: false
+        descriptorDone = null
+        return ok
     }
 
     private suspend fun send(cmd: String, timeoutMs: Long = 1500, expectMarker: String? = null): String = cmdMutex.withLock {
         val g = gatt ?: return ""
         val wc = writeChar ?: return ""
         if (!_state.value.connected && !cmd.startsWith("AT")) return ""
-        buf = StringBuilder()
+        synchronized(bufLock) { buf = StringBuilder() }
         expect = expectMarker?.uppercase()
         val resp = withTimeoutOrNull(timeoutMs) {
             suspendCancellableCoroutine { k ->
@@ -270,12 +293,12 @@ object Engine {
                     wc.value = (cmd + "\r").toByteArray(Charsets.ISO_8859_1)
                     wc.writeType = if (wc.properties and BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE != 0)
                         BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE else BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-                    if (!g.writeCharacteristic(wc)) { responseWaiter = null; k.resume("") }
+                    if (!g.writeCharacteristic(wc)) { responseWaiter = null; if (k.isActive) k.resume("") }
                 }
             }
         }
         responseWaiter = null; expect = null
-        resp ?: buf.toString().also { buf = StringBuilder() }
+        resp ?: synchronized(bufLock) { buf.toString().also { buf = StringBuilder() } }
     }
 
     private fun flatHex(resp: String): String =
@@ -288,7 +311,15 @@ object Engine {
         var raw = 0L
         for (i in 0 until e.bytes) raw = (raw shl 8) or hex.substring(i * 2, i * 2 + 2).toLong(16)
         if (e.did == "3401") {
-            if (!iSigned && iSeen < 12) { iSeen++; if (raw > 32767 || raw < 1000) iSigned = true }
+            if (!iDecided) {
+                iSeen++; if (raw < 1000) iLow++
+                if (raw > 32767) { iSigned = true; iDecided = true }          // impossible in offset-binary: proof
+                else if (iSeen >= 12) {
+                    if (iLow >= 12) { iSigned = true; iDecided = true }       // twelve "< −220 A" readings: small signed values
+                    else if (iLow == 0) iDecided = true                       // plain offset-binary
+                    else { iSeen = 0; iLow = 0 }                              // mixed (heavy charging?): sample again
+                }
+            }
             return if (iSigned) (if (raw > 32767) raw - 65536 else raw) * 0.1 else raw * 0.1 - 320.0
         }
         var v = raw * e.f + e.o
@@ -366,5 +397,5 @@ object Engine {
         update { Telemetry(status = "Not connected") }
     }
 
-    private fun update(fn: (Telemetry) -> Telemetry) { _state.value = fn(_state.value) }
+    private fun update(fn: (Telemetry) -> Telemetry) { _state.update(fn) }   // CAS: Binder vs IO thread writes cannot lose each other
 }

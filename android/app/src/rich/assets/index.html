@@ -457,7 +457,7 @@ const VIN_TABLE = [
   [/^MAT832/, "tata_punch_ev_mr"], [/^MAT83[35]/, "tata_punch_ev_lr"], [/^MAT834/, "tata_punch_ev_40"],
   [/^MAT62[01]/, "tata_nexon_ev_prime"], [/^MAT62[23]/, "tata_nexon_ev_max"],
   [/^MAT624/, "tata_tiago_ev_mr"], [/^MAT625/, "tata_tiago_ev"],
-  [/^MAT63/, "tata_nexon_ev_45"], [/^MAT636/, "tata_curvv_ev_55"], [/^MAT61/, "tata_harrier_ev"],
+  [/^MAT636/, "tata_curvv_ev_55"], [/^MAT63/, "tata_nexon_ev_45"], [/^MAT61/, "tata_harrier_ev"],
   [/^LGX/, "byd_atto_3"], [/^(MZ7|LSJ|MAJ|MEX)/, "mg_zs_ev"],
 ];
 
@@ -518,10 +518,12 @@ class Elm {
   }
 
   async attach(dev) {
+    if (this.connected && this.dev === dev) return;      // already linked: never add a second notification listener
+    let ct = null;
     const gatt = await Promise.race([
       dev.gatt.connect(),
-      new Promise((_, rej) => setTimeout(() => { try { dev.gatt.disconnect(); } catch (e) {} rej(new Error("connect timeout")); }, 10000)),
-    ]);
+      new Promise((_, rej) => { ct = setTimeout(() => { try { dev.gatt.disconnect(); } catch (e) {} rej(new Error("connect timeout")); }, 10000); }),
+    ]).finally(() => clearTimeout(ct));                  // the timer must never fire after a successful connect
     dev.ongattserverdisconnected = () => { this.connected = false; if (this.onDisconnect) this.onDisconnect(); };
     let pair = null;
     for (const c of BLE_UUIDS) {
@@ -606,17 +608,26 @@ function udsPayload(resp, sid, id) {
    (that would be +2950 A) or sit below ~1000 (−220 A sustained), so either
    observation proves the signed encoding. Verdict is logged and remembered
    per vehicle profile. */
+/* the current-decode verdict belongs to the CAR, not the profile: keyed by VIN when known */
+function ivarKey() { return "evm_ivar_" + (S.vin || (S.profile ? S.profile.id : "x")); }
 function decodeCurrent(raw) {
   if (S.iVar == null) {
     S.iRawSeen = (S.iRawSeen || 0) + 1;
+    if (S.iRawSeen === 1) { S.iLow = 0; S.iSoc0 = S.t.soc ?? null; }
+    if (raw < 1000) S.iLow++;
     if (S.iRawSeen <= 3) logLine("packI raw sample: 0x" + raw.toString(16).toUpperCase().padStart(4, "0") + " (calibrating decode)", "info");
-    if (raw > 32767 || raw < 1000) {
-      S.iVar = "signed";
+    if (raw > 32767) {
+      S.iVar = "signed";                       // impossible in offset-binary: proof of two's-complement
     } else if (S.iRawSeen >= 12) {
-      S.iVar = "offset";
+      // raw < 1000 in offset-binary would mean < −220 A of CHARGE; twelve such samples with
+      // SOC not rising cannot be charging, so they must be small signed values
+      const socRose = S.iSoc0 != null && S.t.soc != null && S.t.soc - S.iSoc0 >= 0.1;
+      if (S.iLow >= 12 && !socRose) S.iVar = "signed";
+      else if (S.iLow === 0) S.iVar = "offset";
+      else { S.iRawSeen = 0; logLine("current decode ambiguous (heavy charging?) — sampling again", "info"); }
     }
     if (S.iVar) {
-      store.set("evm_ivar_" + (S.profile ? S.profile.id : "x"), S.iVar);
+      store.set(ivarKey(), S.iVar);
       logLine("current decode calibrated: " + S.iVar + (S.iVar === "signed" ? " (gen-1 style)" : " (gen-2 style)"), "ok");
     }
   }
@@ -660,7 +671,9 @@ function installNativeBridge() {
     }
   };
   const nsend = (cmd, timeout = 2200, expect = null) => new Promise(res => {
-    const id = String(++pid); pend[id] = res;
+    const id = String(++pid);
+    const t = setTimeout(() => { if (pend[id]) { delete pend[id]; res(""); } }, timeout + 1500);
+    pend[id] = r => { clearTimeout(t); res(r); };
     EvNative.send(id, cmd, Math.round(timeout), expect || "");
   });
   elm.send = (cmd, timeout, expect) => {
@@ -680,13 +693,15 @@ function installNativeBridge() {
   elm.disconnect = () => { EvNative.disconnect(); elm.connected = false; };
 }
 
-const APP_VER = "1.4";
+const APP_VER = "1.4.1";
 
 const S = {
   profile: null, view: "connect", night: false, polling: false, scanning: false,
   t: {},                                   // live telemetry
   reads: 0, misses: 0,
-  session: { start: 0, eOut: 0, eIn: 0, lastT: 0, lastP: 0, odoStart: null, odoNow: null, range: {} },
+  session: { start: 0, eOut: 0, eIn: 0, eRegen: 0, lastT: 0, lastP: 0, lastIAt: 0, odoStart: null, odoNow: null, range: {} },
+  vin: null, pollActive: false, pollExit: null, diagRunning: false, userDisc: false,
+  iLow: 0, iSoc0: null,
   charging: false, chargeStreak: 0, idleStreak: 0,
   powerState: "idle", pendState: "idle", pendStreak: 0, powerEma: null,
   rec: null,                               // active 95-100% AC recording window
@@ -730,6 +745,8 @@ function step(id, state, text) {
 async function connectFlow(silent) {
   try {
     if (!navigator.bluetooth && !window.EvNative) throw new Error("No Web Bluetooth in this browser. Use Chrome or Edge on Android.");
+    S.userDisc = false;
+    if (S.polling || S.pollActive) { S.polling = false; await waitPollExit(); }   // re-detect on a live link: no polls between init commands
     step("stAdapter", "on", "Reconnecting to saved adapter…");
     const r = await elm.reconnectSilent();
     if (!r.ok) {
@@ -762,9 +779,17 @@ async function connectFlow(silent) {
         if (vin) break;
       }
     }
+    let vinKnown = false;
     if (vin) {
       step("stVin", "ok", "VIN · " + vin.slice(0, 6) + "•••" + vin.slice(-4));
-      for (const [re, id] of VIN_TABLE) if (re.test(vin)) { profId = id; break; }
+      S.vin = vin;
+      for (const [re, id] of VIN_TABLE) if (re.test(vin)) { profId = id; vinKnown = true; break; }
+      // a remembered profile only applies to the car it was chosen on
+      const savedVin = store.get("evm_profile_vin");
+      if (!vinKnown && savedVin && savedVin !== vin) {
+        profId = null;
+        logLine("different vehicle (VIN " + vin.slice(0, 6) + "…) — remembered profile not applied; pick your model if the fingerprint is wrong", "info");
+      }
     } else step("stVin", "fail", "VIN unreadable — using fingerprint");
 
     /* BMS handshake with the (candidate) profile */
@@ -782,7 +807,8 @@ async function connectFlow(silent) {
     const alive = await establishSession(prof);
     step("stBms", alive ? "ok" : "fail", alive ? `BMS on ${prof.hdr}/${prof.rx} · responding` : `BMS on ${prof.hdr} — no answer (ignition on?)`);
 
-    setProfile(prof, vin ? "matched from VIN prefix " + vin.slice(0, 6) : "CAN fingerprint / manual");
+    setProfile(prof, vin ? (vinKnown ? "matched from VIN prefix " + vin.slice(0, 6) : "VIN " + vin.slice(0, 6) + " not in table — fingerprint; pick your model to correct")
+                          : "CAN fingerprint / manual");
     $("btnStart").classList.remove("hidden");
     $("btnConnect").textContent = "Re-detect";
     if (silent && alive) startMonitoring();
@@ -802,9 +828,11 @@ function vinFrom(bytes) {
 }
 function setProfile(prof, how) {
   S.profile = prof;
-  S.iVar = store.get("evm_ivar_" + prof.id) || null;   // per-vehicle current decode
+  S.iVar = store.get(ivarKey()) || null;               // per-vehicle current decode (VIN-keyed when known)
   S.iRawSeen = 0;
+  S.badDids = {};                                      // NRC blacklist is per vehicle/session
   store.set("evm_profile", prof.id);
+  if (S.vin) store.set("evm_profile_vin", S.vin);      // which car this remembered profile belongs to
   $("selProfile").value = prof.id;
   $("detCard").classList.remove("hidden");
   $("detName").textContent = prof.name;
@@ -827,6 +855,7 @@ function chargeLossWatchdog() {
 }
 function onAdapterLost() {
   S.polling = false;
+  if (S.userDisc) { $("connDot").classList.remove("on"); $("connTxt").textContent = "Not connected"; return; }
   chargeLossWatchdog();
   $("connDot").classList.remove("on"); $("connTxt").textContent = "Reconnecting…";
   logLine("adapter disconnected — auto-reconnect armed", "err");
@@ -841,8 +870,9 @@ function scheduleReconnect() {
   const attempt = async () => {
     reconTimer = null;
     if (elm.connected) return;
-    if (++tries > 120) { $("connTxt").textContent = "Lost"; return; }
+    if (S.userDisc) return;
     if (document.visibilityState === "visible") {
+      if (++tries > 120) { $("connTxt").textContent = "Lost"; return; }   // only visible attempts count
       try {
         if ((await elm.reconnectSilent()).ok) {
           await quickInit();
@@ -890,8 +920,9 @@ async function readKey(key) {
   const resp = await elm.send("22" + e.did, 1000, "62" + e.did);
   const bytes = udsPayload(resp, "62", e.did);
   if (!bytes) {
-    if (flatHex(resp).includes("7F22")) { S.badDids[e.did] = 1; logLine("DID $" + e.did + " not supported by this BMS — skipping from now on", "info"); }
-    else S.misses++;
+    const nrc = (flatHex(resp).match(/7F22([0-9A-F]{2})/) || [])[1];
+    if (nrc === "31" || nrc === "12") { S.badDids[e.did] = 1; logLine("DID $" + e.did + " not supported by this BMS (NRC " + nrc + ") — skipping from now on", "info"); }
+    else S.misses++;                                   // transient NRCs (busy, pending, wrong session) are just misses
     return null;
   }
   S.reads++;
@@ -942,28 +973,41 @@ async function readBatch(keys) {
 
 let slowIdx = 0;
 async function pollLoop() {
-  S.polling = true;
+  if (S.pollActive || S.diagRunning) return;          // one loop only; never during a diagnostic capture
+  S.polling = true; S.pollActive = true;
   S.session.start = S.session.start || Date.now();
   let lastTP = 0;
   const BATCHES = [["soc", "packV", "packI"], ["maxV", "minV", "maxN"], ["minN", "delta", "lv"]];
-  while (S.polling && elm.connected) {
-    for (const b of BATCHES) { if (!S.polling) break; await readBatch(b); render(); }
-    await readKey(SLOW_KEYS[slowIdx++ % SLOW_KEYS.length]);
-    if (S.charging) await readKey("bal");   // promote balance read while charging to catch transitions fast
-    if (S.sessMode === "extended" && Date.now() - lastTP > 2500) { await elm.send("3E80", 800); lastTP = Date.now(); }
-    tick();
-    render();
-    // odometer every 2 min, not while charging
-    if (!S.charging && Date.now() - S.lastOdoAt > 120000) { S.lastOdoAt = Date.now(); await readOdo(); }
+  try {
+    while (S.polling && elm.connected) {
+      for (const b of BATCHES) { if (!S.polling) break; await readBatch(b); render(); }
+      if (!S.polling) break;                          // stop requested: no tail commands
+      await readKey(SLOW_KEYS[slowIdx++ % SLOW_KEYS.length]);
+      if (S.charging) await readKey("bal");   // promote balance read while charging to catch transitions fast
+      if (S.sessMode === "extended" && Date.now() - lastTP > 2500) { await elm.send("3E80", 800); lastTP = Date.now(); }
+      tick();
+      render();
+      // odometer every 2 min, not while charging
+      if (S.polling && !S.charging && Date.now() - S.lastOdoAt > 120000) { S.lastOdoAt = Date.now(); await readOdo(); }
+    }
+  } finally {
+    S.pollActive = false;
+    const r = S.pollExit; S.pollExit = null; if (r) r();
   }
+}
+/* wait until the poll loop has really finished its in-flight command (tools, diagnostic, re-detect) */
+function waitPollExit(capMs = 8000) {
+  if (!S.pollActive) return Promise.resolve();
+  return new Promise(res => { const t = setTimeout(res, capMs); S.pollExit = () => { clearTimeout(t); res(); }; });
 }
 
 async function readOdo() {
-  if (!S.profile || S.profile.make !== "Tata") return;
+  if (!S.profile || S.profile.make !== "Tata" || !S.polling) return;
   try {
     await elm.send("ATSH7E3", 500); await elm.send("ATCRA7EB", 500); await elm.send("1003", 800);
     const bytes = udsPayload(await elm.send("22A001", 1200), "62", "A001");
-    await elm.send("ATSH" + S.profile.hdr, 500); await elm.send("ATCRA" + S.profile.rx, 500); await elm.send("1003", 800);
+    await elm.send("ATSH" + S.profile.hdr, 500); await elm.send("ATCRA" + S.profile.rx, 500);
+    if (S.sessMode === "extended") await elm.send("1003", 800);   // regen-safe: never push the BMS into extended session otherwise
     if (bytes && bytes.length >= 3) {
       const km = (bytes[0] << 16) | (bytes[1] << 8) | bytes[2];
       if (km > 0 && km < 1500000) {
@@ -977,18 +1021,24 @@ async function readOdo() {
 /* ---------- per-sample bookkeeping ---------- */
 function tick() {
   const now = Date.now(), t = S.t;
+  /* a frozen S.t (BMS asleep, link down) must not feed the integrator or the charge detector */
+  const fresh = !!S.lastIAt && S.lastIAt !== S.session.lastIAt;
+  if (fresh) S.session.lastIAt = S.lastIAt;
   /* energy integration */
-  if (t.packV != null && t.packI != null) {
+  if (fresh && t.packV != null && t.packI != null) {
     const p = t.packV * t.packI / 1000;     // kW, + discharge / − charge
     if (S.session.lastT) {
       const dtH = (now - S.session.lastT) / 3600000;
       const avg = (p + S.session.lastP) / 2;
-      if (avg > 0) S.session.eOut += avg * dtH; else S.session.eIn += -avg * dtH;
+      if (dtH < 0.05) {                      // a gap > 3 min (sleep, link loss) is not integrated
+        if (avg > 0) S.session.eOut += avg * dtH;
+        else { S.session.eIn += -avg * dtH; if (!S.charging) S.session.eRegen = (S.session.eRegen || 0) - avg * dtH; }
+      }
     }
     S.session.lastT = now; S.session.lastP = p;
   }
   /* charging state machine */
-  if (t.packI != null) {
+  if (fresh && t.packI != null) {
     if (t.packI < -0.5) { S.chargeStreak++; S.idleStreak = 0; } else { S.idleStreak++; S.chargeStreak = 0; }
     if (!S.charging && S.chargeStreak >= 3) { S.charging = true; S.chargeSince = now; }
     if (S.charging && S.idleStreak >= 25) { S.charging = false; finalizeCharge(); }
@@ -1042,6 +1092,7 @@ function tick() {
     const s = { t: now, soc: t.soc, packV: t.packV, packI: t.packI, maxV: t.maxV, minV: t.minV,
                 maxN: t.maxN, minN: t.minN, delta: liveDelta(), maxT: t.maxT, minT: t.minT };
     S.rec.samples.push(s);
+    if (S.rec.samples.length > 1500) S.rec.samples.splice(0, 100);   // long balancing holds: keep the snapshot small
     for (const k of ["packV", "maxV", "minV", "delta", "maxT", "minT"]) {
       if (s[k] == null) continue;
       const e = S.rec.ext[k] || (S.rec.ext[k] = { lo: s[k], hi: s[k] });
@@ -1167,7 +1218,7 @@ function renderLive() {
   /* third stat: ETA to 100% while charging, trip distance otherwise */
   let third = "—", thirdLbl = charging ? "100% ≈" : "Trip", thirdSub = charging ? "at this rate" : "km";
   if (charging && c.samples.length >= 2 && t.soc != null) {
-    const a2 = c.samples[0], b2 = c.samples[c.samples.length - 1];
+    const a2 = c.samples.find(s => s.t >= S.chargeSince) || c.samples[0], b2 = c.samples[c.samples.length - 1];
     const rate = (b2.soc - a2.soc) / Math.max(1, b2.t - a2.t);
     if (rate > 0) third = new Date(Date.now() + (100 - t.soc) / rate).toTimeString().slice(0, 5);
   } else if (!charging) {
@@ -1284,12 +1335,12 @@ async function runDiagnostic() {
   if (!elm.connected) { logLine("connect first — diagnostic needs a live link", "err"); return; }
   const btn = $("btnDiag");
   const wasPolling = S.polling;
-  S.polling = false;
+  S.polling = false; S.diagRunning = true;
   btn.disabled = true;
   const L = [];
   const put = s => L.push(s);
   try {
-    await new Promise(r => setTimeout(r, 400));
+    await waitPollExit();                     // the loop's in-flight command (incl. odometer header switch) must finish first
     const p = S.profile || {};
     put("evMonitor diagnostic log");
     put("=========================");
@@ -1297,12 +1348,13 @@ async function runDiagnostic() {
     put("captured       : " + new Date().toISOString());
     put("user agent     : " + navigator.userAgent);
     put("adapter        : " + (store.get("evm_device_name") || (elm.dev && elm.dev.name) || "unknown"));
+    put("vin            : " + (S.vin || "not read"));
     put("profile in use : " + (p.id || "?") + "  (" + (p.name || "?") + ")");
     put("profile source : " + ($("detHow") ? $("detHow").textContent : "?"));
     put("did family     : " + (p.fam || "?") + "   header " + (p.hdr || "?") + "/" + (p.rx || "?"));
     put("session mode   : " + S.sessMode);
     put("current decode : iVar=" + (S.iVar == null ? "null (uncalibrated)" : S.iVar) +
-        "  stored=" + (store.get("evm_ivar_" + (p.id || "x")) || "none"));
+        "  stored=" + (store.get(ivarKey()) || "none") + "  key=" + ivarKey());
     put("power state    : " + S.powerState + "   charging=" + S.charging);
     put("reads/misses   : " + S.reads + " / " + S.misses);
     put("blacklisted    : " + (Object.keys(S.badDids).join(",") || "none"));
@@ -1340,7 +1392,7 @@ async function runDiagnostic() {
     put("");
 
     put("--- core DIDs, " + DIAG_ROUNDS + " rounds (raw hex) ---");
-    put("round  time      state       " + DIAG_CORE.map(d => "$" + d).join(" "));
+    put("round".padEnd(6) + "time".padEnd(8) + "  " + "state".padEnd(10) + "  " + DIAG_CORE.map(d => "$" + d).join(" "));
     const i3401 = [];
     for (let n = 1; n <= DIAG_ROUNDS; n++) {
       btn.textContent = "Round " + n + "/" + DIAG_ROUNDS + "…";
@@ -1375,9 +1427,10 @@ async function runDiagnostic() {
   } catch (e) {
     logLine("diagnostic failed: " + e.message, "err");
   } finally {
+    S.diagRunning = false;
     btn.disabled = false;
     btn.textContent = "Capture diagnostic log";
-    if (wasPolling) pollLoop();
+    if (wasPolling && elm.connected) pollLoop();
   }
 }
 
@@ -1434,7 +1487,7 @@ function render() {
   setT("vEIn", S.session.eIn.toFixed(2));
   const trip = S.session.odoNow != null && S.session.odoStart != null ? S.session.odoNow - S.session.odoStart : null;
   setT("vTrip", trip == null ? "—" : trip.toFixed(0));
-  setT("vWhKm", trip ? ((S.session.eOut - S.session.eIn) * 1000 / trip).toFixed(0) : "—");
+  setT("vWhKm", trip ? ((S.session.eOut - (S.session.eRegen || 0)) * 1000 / trip).toFixed(0) : "—");
   const rng = S.session.range;
   const rr = (k, f) => rng[k] ? `▼${f(rng[k].lo)} ▲${f(rng[k].hi)}` : "";
   setT("vPackR", rr("packV", v => v.toFixed(1)));
@@ -1484,6 +1537,7 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") {
     render();                               // repaint immediately on return
     if (S.view === "dash" && !wakeHeld) acquireWake();
+    if (!elm.connected && !S.userDisc && !window.EvNative && store.get("evm_device")) scheduleReconnect();   // resume after a long screen-off
   }
 });
 /* passive dim after 30 s idle — same screen, tap to brighten.
@@ -1770,7 +1824,7 @@ async function scanRange() {
   if (S.scanning) { S.scanning = false; return; }
   const from = parseInt($("scanFrom").value, 16), to = parseInt($("scanTo").value, 16);
   if (isNaN(from) || isNaN(to) || to < from) return;
-  const wasPolling = S.polling; S.polling = false; S.scanning = true;
+  const wasPolling = S.polling; S.polling = false; S.scanning = true; await waitPollExit();
   $("btnScan").textContent = "Stop";
   await new Promise(r => setTimeout(r, 500));
   await elm.send("ATST20", 600);
@@ -1794,7 +1848,7 @@ async function scanRange() {
 }
 
 async function readAllOnce() {
-  const wasPolling = S.polling; S.polling = false;
+  const wasPolling = S.polling; S.polling = false; await waitPollExit();
   await new Promise(r => setTimeout(r, 500));
   const tbody = $("allTbl").querySelector("tbody"); tbody.innerHTML = "";
   for (const [did, name, len, f, o, unit] of TDS_FULL) {
@@ -1819,7 +1873,13 @@ for (const p of PROFILES) {
 }
 $("selProfile").onchange = () => {
   const p = PROFILES.find(x => x.id === $("selProfile").value);
-  if (p) setProfile(p, "manually selected");
+  if (!p) return;
+  setProfile(p, "manually selected");
+  if (elm.connected) (async () => {          // live link: re-apply header + session for the new family
+    const wp = S.polling; S.polling = false; await waitPollExit();
+    await quickInit();
+    if (wp) pollLoop();
+  })();
 };
 $("btnConnect").onclick = () => connectFlow(false);
 $("btnStart").onclick = startMonitoring;
@@ -1855,7 +1915,12 @@ $("btnFocus").onclick = () => {
 $("btnDiag").onclick = runDiagnostic;
 $("btnScan").onclick = scanRange;
 $("btnReadAll").onclick = readAllOnce;
-$("btnDisconnect").onclick = () => { elm.disconnect(); show("connect"); $("ovTools").classList.add("hidden"); };
+$("btnDisconnect").onclick = () => {
+  S.userDisc = true; S.polling = false;
+  if (reconTimer) { clearTimeout(reconTimer); reconTimer = null; }
+  elm.disconnect(); show("connect"); $("ovTools").classList.add("hidden");
+  $("connDot").classList.remove("on"); $("connTxt").textContent = "Not connected";
+};
 $("btnSend").onclick = async () => { const c = $("termIn").value.trim(); if (c) { $("termIn").value = ""; await elm.send(c.toUpperCase(), 4000); } };
 $("termIn").addEventListener("keydown", e => { if (e.key === "Enter") $("btnSend").click(); });
 
@@ -1868,6 +1933,7 @@ $("termIn").addEventListener("keydown", e => { if (e.key === "Enter") $("btnSend
       S.charging = !!lv.charging; S.chargeSince = lv.chargeSince || 0;
       S.sess = lv.sess || null; S.chgm = lv.chgm || null; S.rec = lv.rec || null;
       S.reads = lv.reads || 0; S.misses = lv.misses || 0;
+      if (S.charging) { S.lastIAt = lv.t; S.session.lastIAt = lv.t; }   // sleep watchdog can still end the charge
       logLine("session restored after reload — trip/charge stats continue", "ok");
     } else if (lv && lv.chgm && lv.sess && lv.sess.samples && lv.sess.samples.length > 2 &&
                Date.now() - lv.t < 48 * 3600000) {
@@ -1899,7 +1965,7 @@ $("termIn").addEventListener("keydown", e => { if (e.key === "Enter") $("btnSend
   } else {
     const savedName = store.get("evm_device_name");
     if (savedName) $("connHint").textContent = `Saved adapter: ${savedName} — reconnects without the chooser`;
-    connectFlow(true);   // silent reconnect attempt
+    connectFlow(true).then(ok => { if (!ok && S.charging) chargeLossWatchdog(); });   // silent reconnect attempt
   }
   if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
 })();

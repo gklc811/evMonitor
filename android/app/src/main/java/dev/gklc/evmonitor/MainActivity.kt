@@ -134,7 +134,7 @@ class MainActivity : Activity() {
         }
         scanner.startScan(cb)
         Handler(Looper.getMainLooper()).postDelayed({
-            scanner.stopScan(cb)
+            try { scanner.stopScan(cb) } catch (e: Exception) {}
             if (status.text.startsWith("Scanning")) status.text = "Pick your adapter (${found.size} found)"
         }, 8000)
     }

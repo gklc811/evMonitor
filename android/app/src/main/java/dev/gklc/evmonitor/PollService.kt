@@ -27,10 +27,10 @@ class PollService : Service() {
                 NotificationChannel(channelId, "Live monitoring", NotificationManager.IMPORTANCE_LOW)
             )
         }
-        val open = PendingIntent.getActivity(
-            this, 0, Intent(this, MainActivity::class.java),
-            PendingIntent.FLAG_IMMUTABLE
-        )
+        // a fresh process after a kill has no link: don't advertise one
+        if (intent == null && !Engine.state.value.connected) { stopSelf(); return START_NOT_STICKY }
+        val launch = packageManager.getLaunchIntentForPackage(packageName) ?: Intent(this, MainActivity::class.java)
+        val open = PendingIntent.getActivity(this, 0, launch, PendingIntent.FLAG_IMMUTABLE)
         val notif: Notification = Notification.Builder(this, channelId)
             .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
             .setContentTitle("evMonitor")
@@ -42,7 +42,7 @@ class PollService : Service() {
             startForeground(1, notif, ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
         else
             startForeground(1, notif)
-        return START_STICKY
+        return START_NOT_STICKY
     }
 
     companion object {
