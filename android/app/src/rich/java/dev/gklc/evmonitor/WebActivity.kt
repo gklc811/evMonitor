@@ -8,6 +8,7 @@ import android.bluetooth.BluetoothManager
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Build
@@ -18,7 +19,9 @@ import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.widget.ArrayAdapter
 import android.widget.Toast
+import androidx.core.content.FileProvider
 import org.json.JSONObject
+import java.io.File
 
 /**
  * app2 ("rich" flavor): the full evMonitor web dashboard rendered in a WebView,
@@ -79,6 +82,31 @@ class WebActivity : Activity() {
 
         @JavascriptInterface
         fun disconnect() { Engine.disconnect() }
+
+        /** Write a text file and open the share sheet (WebView ignores blob downloads). */
+        @JavascriptInterface
+        fun saveFile(name: String, content: String) {
+            runOnUiThread {
+                try {
+                    val safe = name.replace(Regex("[^A-Za-z0-9._-]"), "_")
+                    val dir = File(cacheDir, "share").apply { mkdirs() }
+                    val f = File(dir, safe)
+                    f.writeText(content)
+                    val uri = FileProvider.getUriForFile(
+                        this@WebActivity, "$packageName.fileprovider", f
+                    )
+                    val send = Intent(Intent.ACTION_SEND).apply {
+                        type = if (safe.endsWith(".csv")) "text/csv" else "text/plain"
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        putExtra(Intent.EXTRA_SUBJECT, safe)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    startActivity(Intent.createChooser(send, "Share $safe"))
+                } catch (e: Exception) {
+                    Toast.makeText(this@WebActivity, "Could not save file: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
     }
 
     /* ---------------- pairing: scan dialog, saves the MAC ---------------- */

@@ -17,8 +17,8 @@ android {
         applicationId = "dev.gklc.evmonitor"
         minSdk = 26
         targetSdk = 36
-        versionCode = 5
-        versionName = "1.3"
+        versionCode = 6
+        versionName = "1.4"
     }
     flavorDimensions += "ui"
     productFlavors {

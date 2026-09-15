@@ -333,6 +333,12 @@
     <div style="max-height: 240px; overflow-y: auto;">
       <table id="allTbl"><tbody></tbody></table>
     </div>
+    <div class="lbl tile-lbl" style="font-size: 11px;">Support</div>
+    <button class="primary" id="btnDiag">Capture diagnostic log</button>
+    <div class="num" style="font-size: 10px; color: var(--mut); line-height: 1.5;">
+      Records ~40 s of raw BMS responses, then offers the file to share. Run it with the
+      ignition on: once parked &amp; still, once while driving, once while charging if possible.
+    </div>
     <button class="ghost" id="btnDisconnect" style="border-color: #5a2727; color: var(--crit);">Disconnect adapter</button>
   </div>
 </div>
@@ -673,6 +679,8 @@ function installNativeBridge() {
   elm.pick = async () => { EvNative.openPairing(); throw new Error("Pick your adapter in the list, then tap Connect again"); };
   elm.disconnect = () => { EvNative.disconnect(); elm.connected = false; };
 }
+
+const APP_VER = "1.4";
 
 const S = {
   profile: null, view: "connect", night: false, polling: false, scanning: false,
@@ -1222,6 +1230,157 @@ function closeSheets(viaPop) {
 window.closeSheets = closeSheets;
 window.addEventListener("popstate", () => closeSheets(true));
 
+/* Save a text file: native share sheet inside the app, blob download on the web.
+   (A blob <a download> is silently ignored by Android WebView, hence the bridge.) */
+function saveTextFile(name, text, mime) {
+  if (window.EvNative && EvNative.saveFile) {
+    try { EvNative.saveFile(name, text); return true; } catch (e) {}
+  }
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([text], { type: mime || "text/plain" }));
+  a.download = name;
+  a.click();
+  return true;
+}
+
+/* ---- diagnostic capture: raw, undecoded BMS responses for offline analysis ---- */
+const DIAG_IDENT = ["F190", "F191", "F188", "F187", "F18C", "F1A0"];
+const DIAG_CORE = ["3400", "3401", "3402", "3403", "3415", "3417", "3419", "341A",
+                   "34D5", "3409", "340B", "3412", "3479", "3492"];
+// alternate families: if these answer, the pack is $30xx (TacoGotion/CESL/Kratos) not KPD $34xx
+const DIAG_ALT = ["300D", "300E", "300F", "3010", "3011", "3012", "3017", "3018",
+                  "3019", "301A", "3051", "3043", "305B", "3054", "3024"];
+const DIAG_ROUNDS = 8;
+
+async function rawRead(did) {
+  const resp = await elm.send("22" + did, 1200, "62" + did);
+  const flat = flatHex(resp);
+  const i = flat.indexOf("62" + did);
+  if (i < 0) {
+    const nrc = flat.indexOf("7F22");
+    return { did, ok: false, note: nrc >= 0 ? "NRC 7F22" + flat.substr(nrc + 4, 2) : (resp || "").replace(/[\r\n>]+/g, " ").trim() || "no answer" };
+  }
+  const hex = flat.substring(i + 6);
+  return { did, ok: true, hex };
+}
+
+function diagCandidates(rawHex) {
+  if (!rawHex || rawHex.length < 4) return [];
+  const raw = parseInt(rawHex.substr(0, 4), 16);
+  const s = raw > 32767 ? raw - 65536 : raw;
+  return [
+    ["raw u16", raw],
+    ["KPD   (raw*0.1 - 320)", raw * 0.1 - 320],
+    ["Taco  (raw*0.1 - 60)", raw * 0.1 - 60],
+    ["CESL  (raw*0.5 - 500)", raw * 0.5 - 500],
+    ["HECU  (raw*1   - 500)", raw - 500],
+    ["signed*0.1", s * 0.1],
+    ["signed*0.5", s * 0.5],
+    ["no offset raw*0.1", raw * 0.1],
+  ];
+}
+
+async function runDiagnostic() {
+  if (!elm.connected) { logLine("connect first — diagnostic needs a live link", "err"); return; }
+  const btn = $("btnDiag");
+  const wasPolling = S.polling;
+  S.polling = false;
+  btn.disabled = true;
+  const L = [];
+  const put = s => L.push(s);
+  try {
+    await new Promise(r => setTimeout(r, 400));
+    const p = S.profile || {};
+    put("evMonitor diagnostic log");
+    put("=========================");
+    put("app            : " + APP_VER + (window.EvNative ? " (native)" : " (web)"));
+    put("captured       : " + new Date().toISOString());
+    put("user agent     : " + navigator.userAgent);
+    put("adapter        : " + (store.get("evm_device_name") || (elm.dev && elm.dev.name) || "unknown"));
+    put("profile in use : " + (p.id || "?") + "  (" + (p.name || "?") + ")");
+    put("profile source : " + ($("detHow") ? $("detHow").textContent : "?"));
+    put("did family     : " + (p.fam || "?") + "   header " + (p.hdr || "?") + "/" + (p.rx || "?"));
+    put("session mode   : " + S.sessMode);
+    put("current decode : iVar=" + (S.iVar == null ? "null (uncalibrated)" : S.iVar) +
+        "  stored=" + (store.get("evm_ivar_" + (p.id || "x")) || "none"));
+    put("power state    : " + S.powerState + "   charging=" + S.charging);
+    put("reads/misses   : " + S.reads + " / " + S.misses);
+    put("blacklisted    : " + (Object.keys(S.badDids).join(",") || "none"));
+    put("");
+
+    btn.textContent = "Adapter…";
+    put("--- adapter ---");
+    for (const c of ["ATI", "ATDP", "ATRV"]) {
+      const r = await elm.send(c, 1500);
+      put(c.padEnd(6) + ": " + (r || "").replace(/[\r\n>]+/g, " ").trim());
+    }
+    put("");
+
+    btn.textContent = "Identity…";
+    put("--- identity DIDs (raw) ---");
+    for (const d of DIAG_IDENT) {
+      const r = await rawRead(d);
+      let ascii = "";
+      if (r.ok) {
+        ascii = (r.hex.match(/../g) || []).map(h => {
+          const b = parseInt(h, 16); return b >= 32 && b < 127 ? String.fromCharCode(b) : ".";
+        }).join("");
+      }
+      put("$" + d + " : " + (r.ok ? r.hex + "   \"" + ascii + "\"" : r.note));
+    }
+    put("");
+
+    btn.textContent = "Alt family…";
+    put("--- alternate-family probe ($30xx) ---");
+    put("(if these answer, the pack is NOT the KPD $34xx map)");
+    for (const d of DIAG_ALT) {
+      const r = await rawRead(d);
+      put("$" + d + " : " + (r.ok ? r.hex : r.note));
+    }
+    put("");
+
+    put("--- core DIDs, " + DIAG_ROUNDS + " rounds (raw hex) ---");
+    put("round  time      state       " + DIAG_CORE.map(d => "$" + d).join(" "));
+    const i3401 = [];
+    for (let n = 1; n <= DIAG_ROUNDS; n++) {
+      btn.textContent = "Round " + n + "/" + DIAG_ROUNDS + "…";
+      const cells = [];
+      for (const d of DIAG_CORE) {
+        const r = await rawRead(d);
+        if (d === "3401" && r.ok) i3401.push(r.hex.substr(0, 4));
+        cells.push((r.ok ? r.hex : "----").padEnd(String("$" + d).length));
+      }
+      put(String(n).padEnd(6) + new Date().toTimeString().slice(0, 8) + "  " +
+          (S.powerState + "        ").slice(0, 10) + "  " + cells.join(" "));
+      await new Promise(r => setTimeout(r, 2000));
+    }
+    put("");
+
+    put("--- $3401 (current) decode candidates ---");
+    put("The vehicle's TRUE current is ~0 A when parked, still, foot off.");
+    put("Whichever row reads ~0 in a parked capture is the correct formula.");
+    for (const hex of i3401.slice(0, 3)) {
+      put("raw " + hex + ":");
+      for (const [nm, v] of diagCandidates(hex)) put("   " + nm.padEnd(24) + " = " + (typeof v === "number" ? v.toFixed(1) : v));
+    }
+    put("");
+
+    put("--- app log tail ---");
+    for (const [msg] of logBuf.slice(-60)) put(msg);
+
+    const name = "evmonitor-diag-" + (p.id || "unknown") + "-" +
+                 new Date().toISOString().slice(0, 16).replace(/[T:]/g, "-") + ".txt";
+    saveTextFile(name, L.join("\n"));
+    logLine("diagnostic captured: " + name, "ok");
+  } catch (e) {
+    logLine("diagnostic failed: " + e.message, "err");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Capture diagnostic log";
+    if (wasPolling) pollLoop();
+  }
+}
+
 function getReports() { try { return JSON.parse(store.get("evm_reports")) || []; } catch (e) { return []; } }
 
 /* ============================ Rendering ============================ */
@@ -1583,10 +1742,8 @@ function exportCsv(id) {
     : ["t", "soc", "packV", "packI", "maxV", "minV", "maxN", "minN", "delta", "maxT", "minT"];
   const rows = [keys.join(",")];
   for (const s of r.samples) rows.push(keys.map(k => k === "t" ? new Date(s.t).toISOString() : (s[k] ?? "")).join(","));
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([rows.join("\n")], { type: "text/csv" }));
-  a.download = "charge-report-" + new Date(r.start).toISOString().slice(0, 16).replace(/[T:]/g, "-") + ".csv";
-  a.click();
+  saveTextFile("charge-report-" + new Date(r.start).toISOString().slice(0, 16).replace(/[T:]/g, "-") + ".csv",
+               rows.join("\n"), "text/csv");
 }
 
 function renderReportsList() {
@@ -1695,6 +1852,7 @@ $("btnFocus").onclick = () => {
   queueFit();
   render();
 };
+$("btnDiag").onclick = runDiagnostic;
 $("btnScan").onclick = scanRange;
 $("btnReadAll").onclick = readAllOnce;
 $("btnDisconnect").onclick = () => { elm.disconnect(); show("connect"); $("ovTools").classList.add("hidden"); };
