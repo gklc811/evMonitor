@@ -20,8 +20,8 @@
 
   "tata_ev_bms_dids_field_tested": {
     "_header": "ATSH785 / ATCRA78D, session 1003 — values as used live by evds.sayuk.cloud",
-    "3400": { "name": "Pack voltage",      "bytes": 2, "factor": 0.01, "offset": 0,    "unit": "V", "tds_says_factor": 0.1 },
-    "3401": { "name": "Pack current",      "bytes": 2, "factor": 0.1,  "offset": -320, "unit": "A" },
+    "3400": { "name": "Pack voltage",      "bytes": 2, "factor": 0.01, "offset": 0,    "unit": "V", "tds_says_factor": 0.1, "note": "PUNCH EV: x0.01. Nexon.ev LR and Tigor EV use the TDS-documented x0.1. Guard: if raw x0.1 > 500 V, use x0.01." },
+    "3401": { "name": "Pack current",      "bytes": 2, "factor": 0.1,  "offset": -320, "unit": "A", "note": "PUNCH EV ONLY (zero at raw 3200). Scale is 0.1 A/bit on every car tested, but TDS documents offset -3200 (zero at raw 32000) and the Nexon.ev LR + Tigor EV follow it; the Punch reports current and pack voltage at 10x finer raw scaling. Detect per car: raw <= 9000 => zero 3200; raw 24000..40000 => zero 32000." },
     "3402": { "name": "SOC",               "bytes": 2, "factor": 0.1,  "offset": 0,    "unit": "%" },
     "3403": { "name": "SOH",               "bytes": 2, "factor": 0.1,  "offset": 0,    "unit": "%" },
     "3412": { "name": "Pack avg temp",     "bytes": 1, "factor": 1,    "offset": -40,  "unit": "C" },

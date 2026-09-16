@@ -23,24 +23,29 @@ import kotlin.coroutines.resume
  * only fall back to extended (10 03 + tester-present) if data DIDs refuse.
  */
 
-data class DidEntry(val did: String, val bytes: Int, val f: Double, val o: Double, val sanity500: Boolean = false)
+data class DidEntry(
+    val did: String, val bytes: Int, val f: Double, val o: Double,
+    val sanity500: Boolean = false,
+    /* physically possible range — anything outside is a misparsed frame, not a reading */
+    val lo: Double = -1e9, val hi: Double = 1e9,
+)
 
 object DidMap {
     val tata34 = mapOf(
-        "soc"   to DidEntry("3402", 2, 0.1, 0.0),
-        "soh"   to DidEntry("3403", 2, 0.1, 0.0),
-        "packV" to DidEntry("3400", 2, 0.1, 0.0, sanity500 = true),
+        "soc"   to DidEntry("3402", 2, 0.1, 0.0, lo = 0.0, hi = 100.5),
+        "soh"   to DidEntry("3403", 2, 0.1, 0.0, lo = 0.0, hi = 100.5),
+        "packV" to DidEntry("3400", 2, 0.1, 0.0, sanity500 = true, lo = 40.0, hi = 900.0),
         "packI" to DidEntry("3401", 2, 0.1, -320.0),
-        "maxV"  to DidEntry("3415", 2, 1.0, 0.0),
-        "minV"  to DidEntry("3417", 2, 1.0, 0.0),
-        "maxN"  to DidEntry("3419", 1, 1.0, 0.0),
-        "minN"  to DidEntry("341A", 1, 1.0, 0.0),
-        "delta" to DidEntry("34D5", 2, 1.0, 0.0),
-        "maxT"  to DidEntry("3409", 1, 1.0, -40.0),
-        "minT"  to DidEntry("340B", 1, 1.0, -40.0),
-        "avgT"  to DidEntry("3412", 1, 1.0, -40.0),
-        "bal"   to DidEntry("3479", 1, 1.0, 0.0),
-        "lv"    to DidEntry("3492", 2, 0.001, 0.0),
+        "maxV"  to DidEntry("3415", 2, 1.0, 0.0, lo = 1000.0, hi = 5000.0),
+        "minV"  to DidEntry("3417", 2, 1.0, 0.0, lo = 1000.0, hi = 5000.0),
+        "maxN"  to DidEntry("3419", 1, 1.0, 0.0, lo = 0.0, hi = 255.0),
+        "minN"  to DidEntry("341A", 1, 1.0, 0.0, lo = 0.0, hi = 255.0),
+        "delta" to DidEntry("34D5", 2, 1.0, 0.0, lo = 0.0, hi = 2000.0),
+        "maxT"  to DidEntry("3409", 1, 1.0, -40.0, lo = -40.0, hi = 125.0),
+        "minT"  to DidEntry("340B", 1, 1.0, -40.0, lo = -40.0, hi = 125.0),
+        "avgT"  to DidEntry("3412", 1, 1.0, -40.0, lo = -40.0, hi = 125.0),
+        "bal"   to DidEntry("3479", 1, 1.0, 0.0, lo = 0.0, hi = 255.0),
+        "lv"    to DidEntry("3492", 2, 0.001, 0.0, lo = 5.0, hi = 20.0),
     )
     // batches capped at 3 DIDs: 4-DID requests need a multiframe TX many clones refuse
     val batches = listOf(listOf("soc", "packV", "packI"), listOf("maxV", "minV", "maxN"), listOf("minN", "delta", "lv"))
@@ -88,9 +93,9 @@ object Engine {
     private var misses = 0L
     private var sessMode = "default"
     /* current ($3401) decode self-calibration: two field-confirmed KPD encodings, see decode() */
-    private var iHiRes = false
-    private var iSeen = 0
-    private var iDecided = false
+    private var iZero = 0L
+    private var iAlt = 0L
+    private var iAltN = 0
     private var userDisconnect = false
     /* raw transport mode (rich flavor): the WebView UI drives the ELM/UDS protocol */
     private var rawMode = false
@@ -173,6 +178,16 @@ object Engine {
         connect(ctx, mac, raw = true)
     }
 
+    /** Everything learned about one car. The adapter gets moved between vehicles, so none
+        of it may survive into the next connection. */
+    private fun resetVehicleState() {
+        badDids.clear(); nullRun.clear()
+        multiOk = null
+        iZero = 0L; iAlt = 0L; iAltN = 0
+        reads = 0; misses = 0
+        sessMode = "default"
+    }
+
     fun connect(ctx: Context, mac: String, raw: Boolean = false) {
         app = ctx.applicationContext
         prefs(ctx).edit().putString("mac", mac).apply()
@@ -180,9 +195,10 @@ object Engine {
         rawMode = raw                                   // the caller decides who drives the protocol
         pollJob?.cancel()                               // an old loop must not interleave with the new link's init
         servicesReady = null
+        resetVehicleState()
         scope.launch {
             try {
-                update { it.copy(connected = false, status = "Connecting…") }
+                update { Telemetry(status = "Connecting…") }   // fresh: never carry another car's values
                 val adapter = (ctx.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter
                 val dev = adapter.getRemoteDevice(mac)
                 device = dev
@@ -309,13 +325,33 @@ object Engine {
         var raw = 0L
         for (i in 0 until e.bytes) raw = (raw shl 8) or hex.substring(i * 2, i * 2 + 2).toLong(16)
         if (e.did == "3401") {
-            // KPD $3401: raw×0.1−320 (idle 3200, Punch) or raw×0.01−320 (idle 32000, Nexon LR / Tigor).
-            // A 0.1-res raw ≥ 10000 would be +680 A: impossible, so one such sample proves the 0.01 encoding.
-            if (!iDecided) { iSeen++; if (raw >= 10000) { iHiRes = true; iDecided = true } else if (iSeen >= 12) iDecided = true }
-            return if (iHiRes) raw * 0.01 - 320.0 else raw * 0.1 - 320.0
+            /* Always 0.1 A per bit; only the raw value meaning 0 A differs, and the two
+               are far enough apart that ±320 A of travel never crosses the gap:
+                 zero 3200  → raw 0…6400      (Punch EV)
+                 zero 32000 → raw 28800…35200 (Nexon.ev LR, Tigor EV)
+               Anything in between is a misparsed frame. */
+            // floor 600 (−260 A), not 0: a truncated frame often reads near zero, and at
+            // zero the old floor produced a confident −320 A. Nothing real charges that hard.
+            val fam = when {
+                raw in 600L..9000L -> 3200L
+                raw in 24000L..40000L -> 32000L
+                else -> return null
+            }
+            if (kotlin.math.abs((raw - fam) * 0.1) > 700.0) return null   // non-physical: never adopt on it
+            if (iZero == 0L) iZero = fam
+            else if (fam != iZero) {
+                // one frame in the other band is a misparse, not a BMS swap: need a run
+                iAltN = if (fam == iAlt) iAltN + 1 else 1
+                iAlt = fam
+                if (iAltN < 3) return null
+                iZero = fam; iAltN = 0
+            } else iAltN = 0
+            val a = (raw - iZero) * 0.1
+            return if (kotlin.math.abs(a) > 700.0) null else a   // non-physical ⇒ bad frame
         }
         var v = raw * e.f + e.o
         if (e.sanity500 && v > 500) v = raw * 0.01
+        if (v < e.lo || v > e.hi) return null      // impossible value ⇒ bad frame
         return v
     }
 
@@ -327,7 +363,8 @@ object Engine {
         if (multiOk == false || entries.size == 1) { for ((k, _) in entries) readOne(k, vals); return }
         val cmd = "22" + entries.joinToString("") { it.second.did }
         val flat = flatHex(send(cmd, 1400, "62" + entries[0].second.did))
-        var ok = false
+        var ok = false        // at least one value decoded
+        var parsed = false    // the adapter answered a multi-DID request at all
         val i = flat.indexOf("62")
         if (i >= 0) {
             var p = i + 2; var guard = 0
@@ -336,12 +373,17 @@ object Engine {
                 val hit = entries.firstOrNull { it.second.did == did } ?: break
                 p += 4
                 if (p + hit.second.bytes * 2 > flat.length) break
-                decode(hit.second, flat.substring(p))?.let { vals[hit.first] = it; reads++; ok = true }
+                parsed = true
+                val v = decode(hit.second, flat.substring(p))
+                if (v != null) { vals[hit.first] = v; reads++; ok = true } else misses++
+                noteDecode(hit.first, v != null, vals)
                 p += hit.second.bytes * 2
             }
         }
-        if (ok) { if (multiOk == null) multiOk = true }
-        else { if (multiOk == null) multiOk = false; misses++; for ((k, _) in entries) readOne(k, vals) }
+        // latch the multi-DID verdict on whether the adapter can FRAME the request,
+        // never on whether the values passed their bounds
+        if (multiOk == null && parsed) multiOk = true
+        if (!ok) { if (multiOk == null) multiOk = false; for ((k, _) in entries) readOne(k, vals) }
     }
 
     private suspend fun readOne(key: String, vals: MutableMap<String, Double>) {
@@ -352,10 +394,24 @@ object Engine {
         val idx = flat.indexOf("62" + e.did)
         if (idx < 0) {
             misses++
-            if (flat.contains("7F22")) badDids.add(e.did)
+            // only a definitive "not supported" blacklists; busy/pending are transient
+            val nrc = Regex("7F22([0-9A-F]{2})").find(flat)?.groupValues?.get(1)
+            if (nrc == "31" || nrc == "12") badDids.add(e.did)
             return
         }
-        decode(e, flat.substring(idx + 6))?.let { vals[key] = it; reads++ }
+        val v = decode(e, flat.substring(idx + 6))
+        if (v != null) { vals[key] = v; reads++ } else misses++
+        noteDecode(key, v != null, vals)
+    }
+
+    /* A value that stops decoding must not linger on screen looking live. A couple of
+       bad frames keep the last good reading; a DID that never decodes is dropped. */
+    private val nullRun = HashMap<String, Int>()
+    private fun noteDecode(key: String, ok: Boolean, vals: MutableMap<String, Double>) {
+        if (ok) { nullRun.remove(key); return }
+        val n = (nullRun[key] ?: 0) + 1
+        nullRun[key] = n
+        if (n >= 5) vals.remove(key)
     }
 
     private fun startPolling() {
@@ -383,6 +439,7 @@ object Engine {
 
     fun disconnect() {
         userDisconnect = true
+        resetVehicleState()
         pollJob?.cancel()
         gatt?.close(); gatt = null
         app?.let { PollService.stop(it) }

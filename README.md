@@ -42,4 +42,6 @@ Protocol intelligence extracted from Tata TDS dealer-tool databases and communit
 
 Single-file app (`index.html`), no framework. The BLE transport is an isolated class (`Elm`) so it can be swapped for a Capacitor native-BLE plugin later (enables screen-off background recording and an APK build) without touching the rest of the app.
 
-UDS over ISO-TP: `ATSH <hdr>` → `ATCRA <rx>` → `10 03` (extended session) → `22 <DID>` reads, tester-present `3E 80` every 2.5 s. Decode: `value = raw × factor + offset` per `reference/did-map.json`.
+UDS over ISO-TP: `ATSH <hdr>` → `ATCRA <rx>` → `22 <DID>` reads. The **default** session is used wherever the BMS allows it — holding an extended session (`10 03` + tester-present `3E 80`) was found on the road to cut regen braking — and extended is entered only if the data DIDs refuse in default.
+
+Decode is `value = raw × factor + offset` per `reference/did-map.json`, with one per-vehicle exception: battery current `$3401` is 0.1 A/bit on every car tested, but the raw value meaning 0 A is 32000 on the Nexon.ev LR and Tigor EV (as TDS documents) and 3200 on the Punch EV. The app identifies which from the first valid reading and remembers it per VIN. See `reference/NOTES.md`.

@@ -336,8 +336,13 @@
     <div class="lbl tile-lbl" style="font-size: 11px;">Support</div>
     <button class="primary" id="btnDiag">Capture diagnostic log</button>
     <div class="num" style="font-size: 10px; color: var(--mut); line-height: 1.5;">
-      Records ~40 s of raw BMS responses, then offers the file to share. Run it with the
-      ignition on: once parked &amp; still, once while driving, once while charging if possible.
+      1–3 min of raw BMS responses plus a full $3400–$34FF sweep, then offers the file to
+      share. Ignition on: once parked &amp; still, once driving, once charging if possible.
+    </div>
+    <button class="ghost" id="btnZero">Calibrate current zero</button>
+    <div class="num" style="font-size: 10px; color: var(--mut); line-height: 1.5;">
+      Parked, foot off, A/C and lights OFF. Pins the raw value that means 0 A on this car
+      (it is assumed 3200 or 32000 otherwise). Tap again to reset.
     </div>
     <button class="ghost" id="btnDisconnect" style="border-color: #5a2727; color: var(--crit);">Disconnect adapter</button>
   </div>
@@ -443,7 +448,7 @@ const PROFILES = [
   { id: "tata_nexon_ev_max", name: "Nexon EV Max / LR",    make: "Tata", kwh: 40.5, cells: 104, chem: "LFP 104S8P",  hdr: "785", rx: "78D", fam: "tata34" },
   { id: "tata_nexon_ev_prime", name: "Nexon EV Prime",     make: "Tata", kwh: 30.2, cells: 100, chem: "LFP 100S6P",  hdr: "785", rx: "78D", fam: "tata34" },
   { id: "tata_tiago_ev",     name: "Tiago EV LR",          make: "Tata", kwh: 24.0, cells: 100, chem: "LFP 100S5P",  hdr: "785", rx: "78D", fam: "tata34" },
-  { id: "tata_tigor_ev",     name: "Tigor EV / XPRES-T",   make: "Tata", kwh: 26.0, cells: 100, chem: "LFP Ziptron", hdr: "785", rx: "78D", fam: "tata34" },
+  { id: "tata_tigor_ev",     name: "Tigor EV / XPRES-T",   make: "Tata", kwh: 26.0, cells: 108, chem: "LFP Ziptron", hdr: "785", rx: "78D", fam: "tata34" },
   { id: "tata_tiago_ev_mr",  name: "Tiago EV MR",          make: "Tata", kwh: 19.2, cells: 100, chem: "LFP 100S4P",  hdr: "785", rx: "78D", fam: "tata34" },
   { id: "tata_curvv_ev_55",  name: "Curvv.ev 55",          make: "Tata", kwh: 55.0, cells: 108, chem: "LFP 108S1P",  hdr: "785", rx: "78D", fam: "tata34" },
   { id: "tata_harrier_ev",   name: "Harrier / Sierra.ev",  make: "Tata", kwh: 75.0, cells: 118, chem: "LFP 118S1P",  hdr: "785", rx: "78D", fam: "tata34" },
@@ -456,7 +461,7 @@ const PROFILES = [
 const VIN_TABLE = [
   [/^MAT832/, "tata_punch_ev_mr"], [/^MAT83[35]/, "tata_punch_ev_lr"], [/^MAT834/, "tata_punch_ev_40"],
   [/^MAT62[01]/, "tata_nexon_ev_prime"], [/^MAT62[23]/, "tata_nexon_ev_max"],
-  [/^MAT624/, "tata_tiago_ev_mr"], [/^MAT625/, "tata_tiago_ev"],
+  [/^MAT624/, "tata_tiago_ev_mr"], [/^MAT625/, "tata_tiago_ev"], [/^MAT562/, "tata_tigor_ev"],
   [/^MAT636/, "tata_curvv_ev_55"], [/^MAT635/, "tata_nexon_ev_max"], [/^MAT63/, "tata_nexon_ev_45"], [/^MAT61/, "tata_harrier_ev"],
   [/^LGX/, "byd_atto_3"], [/^(MZ7|LSJ|MAJ|MEX)/, "mg_zs_ev"],
 ];
@@ -601,35 +606,68 @@ function udsPayload(resp, sid, id) {
   for (let j = 0; j + 1 < hex.length; j += 2) bytes.push(parseInt(hex.substr(j, 2), 16));
   return bytes;
 }
-/* Current ($3401) decode self-calibration — see decodeCurrent() for the two field-confirmed encodings. */
-/* the current-decode verdict belongs to the CAR, not the profile: keyed by VIN when known */
-function ivarKey() { return "evm_ivar_" + (S.vin || (S.profile ? S.profile.id : "x")); }
+/* Current ($3401) decode — field-confirmed on three cars.
+   The KPD BMS family always counts in 0.1 A per bit; only the raw value that
+   means ZERO amps differs, and the two zero points are an order of magnitude
+   apart with a wide empty gap between their plausible ranges:
+     "lo"  zero 3200   → raw 0…6400      (Punch EV)
+     "hi"  zero 32000  → raw 28800…35200 (Nexon.ev LR, Tigor EV)
+   ±320 A of travel either way never crosses the gap, so ONE valid sample
+   identifies the family; anything landing in the gap is a misparsed read.
+   Proof of the 0.1 scale on the "hi" cars (Tigor, driving log 2026-09-16):
+   min-cell voltage falls 0.0985 mV per raw count, i.e. ~1 mΩ per cell at
+   0.1 A/bit — the textbook figure. At 0.01 A/bit it would be 10 mΩ, which
+   would put 27 kW of heat into the pack at full power. Also, idle→driving is
+   only 62 counts: 2.2 kW of propulsion at 0.1 A/bit, but 0.22 W at 0.01 —
+   less than the headlights. */
+const I_SCALE = 0.1;
+const I_ZERO = { lo: 3200, hi: 32000 };
+/* Detection bands, deliberately wider than the documented ranges so an unusually
+   hard charge or launch is never mistaken for a bad frame; the gap between them is
+   what matters, and it stays wide. I_MAX_A then rejects anything non-physical. */
+/* The "lo" floor is 600 (−260 A), not 0: a truncated frame very often reads as a
+   near-zero raw, and at zero the old floor produced a confident −320 A. No car in this
+   family charges past −260 A (the Punch tops out near −150 A), so nothing real is lost. */
+const I_BAND = { lo: [600, 9000], hi: [24000, 40000] };
+const I_MAX_A = 700;
+const inBand = (raw, v) => raw >= I_BAND[v][0] && raw <= I_BAND[v][1];
+
+/* the decode belongs to the CAR, not the profile: keyed by VIN when known */
+function ivarKey()  { return "evm_ivar_"  + (S.vin || (S.profile ? S.profile.id : "x")); }
+function izeroKey() { return "evm_izero_" + (S.vin || (S.profile ? S.profile.id : "x")); }
+
+const I_SWITCH = 3;          // consecutive out-of-family samples needed to re-decide
 function decodeCurrent(raw) {
-  /* Field-confirmed KPD $3401 encodings (both zero at −320 A offset, resolution differs 10×):
-       "lo": raw × 0.1  − 320   → idle raw ≈ 3200   (Punch EV, 2024)
-       "hi": raw × 0.01 − 320   → idle raw ≈ 32000  (Nexon.ev LR facelift; expected on Tigor/Tiago)
-     A "lo" raw ≥ 10000 would mean +680 A, impossible; a "hi" raw < 10000 means < −220 A of charge,
-     which only a >75 kW DC session could produce. So one raw ≥ 10000 proves "hi", and twelve
-     raws < 10000 while SOC is not rising prove "lo". */
+  const fam = inBand(raw, "lo") ? "lo" : inBand(raw, "hi") ? "hi" : null;
+  if (!fam) return null;                       // in the dead gap: a misparsed frame, not a current
+  // never commit a verdict on a frame whose own value is non-physical
+  if (Math.abs((raw - I_ZERO[fam]) * I_SCALE) > I_MAX_A) return null;
   if (S.iVar == null) {
-    S.iRawSeen = (S.iRawSeen || 0) + 1;
-    if (S.iRawSeen === 1) S.iSoc0 = S.t.soc ?? null;
-    if (S.iRawSeen <= 3) logLine("packI raw sample: 0x" + raw.toString(16).toUpperCase().padStart(4, "0") + " (calibrating decode)", "info");
-    if (raw >= 10000) {
-      S.iVar = "hi";
-    } else if (S.iRawSeen >= 12) {
-      const socRose = S.iSoc0 != null && S.t.soc != null && S.t.soc - S.iSoc0 >= 0.1;
-      if (!socRose) S.iVar = "lo";
-      else { S.iRawSeen = 0; logLine("current decode ambiguous while charging — sampling again", "info"); }
-    }
-    if (S.iVar) {
-      store.set(ivarKey(), S.iVar);
-      logLine("current decode calibrated: " + (S.iVar === "hi" ? "0.01 A/bit, idle at 32000 (Nexon/Tigor style)" : "0.1 A/bit, idle at 3200 (Punch style)"), "ok");
-    }
-  }
-  return S.iVar === "hi" ? raw * 0.01 - 320 : raw * 0.1 - 320;
+    S.iVar = fam; store.set(ivarKey(), fam);
+    logLine("current decode: zero at " + I_ZERO[fam] + " (" + (fam === "hi" ? "Nexon/Tigor" : "Punch") + " style), 0.1 A/bit", "ok");
+  } else if (fam !== S.iVar) {
+    /* One frame in the other family's band is far more likely to be a misparse than a
+       real family change — a car cannot swap BMS mid-drive. Only a run of them means
+       the remembered verdict is genuinely wrong (e.g. a phone carried to another car). */
+    S.iAlt = (S.iAlt && S.iAlt.fam === fam) ? { fam, n: S.iAlt.n + 1 } : { fam, n: 1 };
+    if (S.iAlt.n < I_SWITCH) return null;       // reject as a bad frame for now
+    logLine("current decode corrected: " + S.iVar + " → " + fam + " (" + I_SWITCH + " samples out of band)", "info");
+    S.iVar = fam; S.iZero = null; S.iAlt = null;   // a family switch invalidates any zero trim
+    store.set(ivarKey(), fam); store.set(izeroKey(), "");
+  } else S.iAlt = null;
+  const a = (raw - (S.iZero != null ? S.iZero : I_ZERO[fam])) * I_SCALE;
+  return Math.abs(a) > I_MAX_A ? null : a;      // no vehicle draws this: a bad frame
 }
 
+/* Physically possible ranges. A value outside these is a misparsed frame, not a
+   reading — without this a single bad frame poisons the session min/max for good
+   (field evidence: a 15.5 V "pack voltage" low and a 0 mV ΔV low on the Tigor). */
+const SANE = {
+  packV: [40, 900], soc: [0, 100.5], soh: [0, 100.5],
+  maxV: [1000, 5000], minV: [1000, 5000], delta: [0, 2000],
+  maxT: [-40, 125], minT: [-40, 125], avgT: [-40, 125], lv: [5, 20],
+  maxN: [0, 255], minN: [0, 255], maxTN: [0, 64], minTN: [0, 64], bal: [0, 65535],
+};
 function decodeEntry(e, bytes, key) {
   if (!bytes || bytes.length < e.bytes) return null;
   let raw = 0;
@@ -638,6 +676,8 @@ function decodeEntry(e, bytes, key) {
   if (key === "packI" && e.did === "3401") return decodeCurrent(raw);
   let v = raw * e.f + e.o;
   if (e.sanity500 && v > 500) v = raw * 0.01;   // scaling ambiguity guard for pack voltage
+  const b = SANE[key];
+  if (b && (v < b[0] || v > b[1])) return null;  // impossible value ⇒ bad frame
   return v;
 }
 
@@ -688,7 +728,7 @@ function installNativeBridge() {
   elm.disconnect = () => { EvNative.disconnect(); elm.connected = false; };
 }
 
-const APP_VER = "1.4.2";
+const APP_VER = "1.4.3";
 
 const S = {
   profile: null, view: "connect", night: false, polling: false, scanning: false,
@@ -696,7 +736,7 @@ const S = {
   reads: 0, misses: 0,
   session: { start: 0, eOut: 0, eIn: 0, eRegen: 0, lastT: 0, lastP: 0, lastIAt: 0, odoStart: null, odoNow: null, range: {} },
   vin: null, pollActive: false, pollExit: null, diagRunning: false, userDisc: false,
-  iSoc0: null,
+  iZero: null, iAlt: null, cellNoBad: {}, nullRun: {}, stShort: false,
   charging: false, chargeStreak: 0, idleStreak: 0,
   powerState: "idle", pendState: "idle", pendStreak: 0, powerEma: null,
   rec: null,                               // active 95-100% AC recording window
@@ -785,7 +825,7 @@ async function connectFlow(silent) {
         profId = null;
         logLine("different vehicle (VIN " + vin.slice(0, 6) + "…) — remembered profile not applied; pick your model if the fingerprint is wrong", "info");
       }
-    } else step("stVin", "fail", "VIN unreadable — using fingerprint");
+    } else { S.vin = null; step("stVin", "fail", "VIN unreadable — using fingerprint"); }   // never key another car's calibration
 
     /* BMS handshake with the (candidate) profile */
     let prof = PROFILES.find(p => p.id === profId) || null;
@@ -824,9 +864,12 @@ function vinFrom(bytes) {
 function setProfile(prof, how) {
   S.profile = prof;
   const sv = store.get(ivarKey());                     // per-vehicle current decode (VIN-keyed when known)
-  S.iVar = sv === "offset" ? "lo" : (sv === "lo" || sv === "hi") ? sv : null;
-  S.iRawSeen = 0;
-  S.badDids = {};                                      // NRC blacklist is per vehicle/session
+  S.iVar = sv === "offset" ? "lo" : (sv === "lo" || sv === "hi") ? sv : null;   // legacy "signed" ⇒ recalibrate
+  const zv = parseInt(store.get(izeroKey()), 10);
+  S.iZero = isFinite(zv) && zv > 0 ? zv : null;
+  S.cellNoBad = {};
+  S.badDids = {}; S.t = {}; S.nullRun = {};            // nothing learned about the last car may survive
+  S.multiOk = null; S.iAlt = null;
   store.set("evm_profile", prof.id);
   if (S.vin) store.set("evm_profile_vin", S.vin);      // which car this remembered profile belongs to
   $("selProfile").value = prof.id;
@@ -921,15 +964,24 @@ async function readKey(key) {
     else S.misses++;                                   // transient NRCs (busy, pending, wrong session) are just misses
     return null;
   }
-  S.reads++;
   const v = decodeEntry(e, bytes, key);
-  if (v !== null) { S.t[key] = v; if (key === "packI") S.lastIAt = Date.now(); }
+  if (v !== null) { S.reads++; S.t[key] = v; if (key === "packI") S.lastIAt = Date.now(); }
+  else S.misses++;
+  noteDecode(key, v !== null);
   return v;
 }
 
 /* Multi-DID ReadDataByIdentifier: one request, several values.
    Falls back to per-DID reads the first time the ECU refuses it. */
 S.multiOk = null;
+/* A reading that stops decoding must not sit on screen looking live. A couple of bad
+   frames keep the last good value; a DID that never decodes again is dropped to "—". */
+function noteDecode(key, ok) {
+  if (ok) { delete S.nullRun[key]; return; }
+  S.nullRun[key] = (S.nullRun[key] || 0) + 1;
+  if (S.nullRun[key] >= 5) delete S.t[key];
+}
+
 async function readBatch(keys) {
   const fam = FAMILIES[S.profile.fam];
   const entries = keys.map(k => [k, fam[k]]).filter(([, e]) => e && !S.badDids[e.did]);
@@ -940,7 +992,7 @@ async function readBatch(keys) {
   }
   const cmd = "22" + entries.map(([, e]) => e.did).join("");
   const flat = flatHex(await elm.send(cmd, 1400, "62" + entries[0][1].did));
-  let ok = false;
+  let ok = false, parsed = false;
   const i = flat.indexOf("62");
   if (i >= 0) {
     let p = i + 2, guard = 0;
@@ -954,15 +1006,18 @@ async function readBatch(keys) {
       const bytes = [];
       for (let j = 0; j < e.bytes; j++) bytes.push(parseInt(flat.substr(p + j * 2, 2), 16));
       p += e.bytes * 2;
+      parsed = true;
       const v = decodeEntry(e, bytes, key);
       if (v !== null) { S.t[key] = v; S.reads++; ok = true; if (key === "packI") S.lastIAt = Date.now(); }
+      else S.misses++;
+      noteDecode(key, v !== null);
     }
   }
-  if (ok) {
-    if (S.multiOk === null) { S.multiOk = true; logLine("multi-DID reads supported — fast polling on", "ok"); }
-  } else {
+  /* the multi-DID verdict is about whether the adapter can FRAME the request,
+     never about whether the values passed their sanity bounds */
+  if (S.multiOk === null && parsed) { S.multiOk = true; logLine("multi-DID reads supported — fast polling on", "ok"); }
+  if (!ok) {
     if (S.multiOk === null) { S.multiOk = false; logLine("multi-DID not supported — using single reads", "info"); }
-    S.misses++;
     for (const [k] of entries) await readKey(k);
   }
 }
@@ -1066,7 +1121,7 @@ function tick() {
     }
   }
   /* session lo/hi ranges for the readouts */
-  const dNow = liveDelta();
+  const dNow = (d => (d != null && d > 0) ? d : null)(liveDelta());   // 0 mV is a bad frame, not a reading
   const pNow = (t.packV != null && t.packI != null) ? t.packV * t.packI / 1000 : null;
   /* smoothed power drives the colour: regen shows within ~1-2s, organically */
   if (pNow != null) S.powerEma = S.powerEma == null ? pNow : S.powerEma + 0.35 * (pNow - S.powerEma);
@@ -1086,7 +1141,7 @@ function tick() {
       logLine("recorder started at " + t.soc.toFixed(1) + "%", "ok");
     }
     const s = { t: now, soc: t.soc, packV: t.packV, packI: t.packI, maxV: t.maxV, minV: t.minV,
-                maxN: t.maxN, minN: t.minN, delta: liveDelta(), maxT: t.maxT, minT: t.minT };
+                maxN: t.maxN, minN: t.minN, delta: dNow, maxT: t.maxT, minT: t.minT };
     S.rec.samples.push(s);
     if (S.rec.samples.length > 1500) S.rec.samples.splice(0, 100);   // long balancing holds: keep the snapshot small
     for (const k of ["packV", "maxV", "minV", "delta", "maxT", "minT"]) {
@@ -1142,6 +1197,30 @@ function tick() {
       if (S.liveOpen && !document.hidden) renderLive();
     }
   }
+}
+/* Some BMSes (Tigor) report a physical channel address here, not a 1..N cell
+   index — it read #144 on a 108-cell pack. Once a key has produced an
+   out-of-range value it is not a cell number on this car, so stop claiming it is. */
+/* Upper bound on a plausible cell index: the larger of the profile's declared count and
+   what the readings imply (packV / lowest cell V), so a stale profile can't hide a real
+   cell. 0 is allowed — some BMSes index from zero. */
+function cellOk(n) {
+  if (n == null) return false;
+  const implied = (S.t.packV && S.t.minV) ? Math.round(S.t.packV / (S.t.minV / 1000)) : 0;
+  const max = (Math.max((S.profile && S.profile.cells) || 0, implied) || 253) + 2;
+  return n >= 0 && n <= max;
+}
+const cellTag = n => cellOk(n) ? "#" + Math.round(n) : "#—";
+function cellNoText(n, key) {
+  if (S.cellNoBad[key]) return "cell —";
+  if (n == null) return "cell #—";
+  /* packV / LOWEST cell voltage is an upper bound on the series count, so take whichever
+     of that and the profile is larger — a profile with a stale cell count (the Tigor shipped
+     as 100S when it is 108S) must not hide a real cell. */
+  if (cellOk(n)) return "cell #" + Math.round(n);
+  S.cellNoBad[key] = 1;
+  logLine("cell numbering unreliable on this BMS (reported #" + Math.round(n) + " on a " + max + "-cell pack) — hiding it", "info");
+  return "cell —";
 }
 function liveDelta() {
   const t = S.t;
@@ -1317,18 +1396,72 @@ function diagCandidates(rawHex) {
   const s = raw > 32767 ? raw - 65536 : raw;
   return [
     ["raw u16", raw],
-    ["KPD-lo (raw*0.1 - 320)", raw * 0.1 - 320],
-    ["KPD-hi (raw*0.01 - 320)", raw * 0.01 - 320],
+    ["zero 3200  x0.1  PUNCH", (raw - 3200) * 0.1],
+    ["zero 32000 x0.1  NEXON/TIGOR", (raw - 32000) * 0.1],
+    ["zero 32000 x0.01 (withdrawn)", raw * 0.01 - 320],
     ["Taco  (raw*0.1 - 60)", raw * 0.1 - 60],
     ["CESL  (raw*0.5 - 500)", raw * 0.5 - 500],
     ["HECU  (raw*1   - 500)", raw - 500],
     ["signed*0.1", s * 0.1],
-    ["signed*0.5", s * 0.5],
-    ["no offset raw*0.1", raw * 0.1],
   ];
 }
 
+async function sweepRead(hex) {
+  const flat = flatHex(await elm.send("22" + hex, 700, "62" + hex));
+  const i = flat.indexOf("62" + hex);
+  return i < 0 ? null : flat.substring(i + 6);
+}
+
+/* Pin the raw value that means 0 A. Parked with the 12 V loads as the only draw,
+   the residual is small and known well enough to beat the ±45-count uncertainty
+   in assuming the round default. */
+const IDLE_W = 350;                       // typical DC-DC draw for 12 V loads, parked
+async function calibrateZero() {
+  if (S.diagRunning || S.scanning) { logLine("another capture is already running", "err"); return; }
+  if (!elm.connected) { logLine("connect first — zero calibration needs a live link", "err"); return; }
+  if (!S.iVar) { logLine("current family not identified yet — wait for one reading", "err"); return; }
+  const def = I_ZERO[S.iVar];
+  if (S.iZero != null) {
+    if (!confirm("Custom zero " + S.iZero + " is in use (default " + def + ").\n\nOK — calibrate again\nCancel — reset to the default")) {
+      S.iZero = null; store.set(izeroKey(), "");
+      logLine("current zero reset to default " + def, "ok"); render(); return;
+    }
+  }
+  const btn = $("btnZero"), wasPolling = S.polling;
+  S.polling = false; S.diagRunning = true; btn.disabled = true;
+  try {
+    await waitPollExit();
+    const raws = [];
+    for (let n = 1; n <= 10; n++) {
+      btn.textContent = "Sampling " + n + "/10…";
+      const hex = await sweepRead("3401");
+      if (hex && hex.length >= 4) raws.push(parseInt(hex.substr(0, 4), 16));
+      await new Promise(r => setTimeout(r, 400));
+    }
+    if (raws.length < 6) { logLine("zero calibration failed — not enough current reads", "err"); return; }
+    raws.sort((a, b) => a - b);
+    const med = raws[Math.floor(raws.length / 2)];
+    const spread = raws[raws.length - 1] - raws[0];
+    if (spread > 60) { logLine("zero calibration aborted — current is not steady (spread " + spread + " counts). Park, foot off, A/C off.", "err"); return; }
+    const pv = S.t.packV || 350;
+    const idleA = IDLE_W / pv;                       // HV amps drawn by the 12 V side
+    const zero = Math.round(med - idleA / I_SCALE);
+    if (Math.abs(zero - I_ZERO[S.iVar]) > 400) {
+      logLine("zero calibration rejected — " + zero + " is too far from the expected " + I_ZERO[S.iVar], "err"); return;
+    }
+    S.iZero = zero; store.set(izeroKey(), String(zero));
+    logLine("current zero calibrated: " + zero + " (default " + def + ", median raw " + med + ", assumed " + IDLE_W + " W idle)", "ok");
+    render();
+  } catch (e) {
+    logLine("zero calibration failed: " + e.message, "err");
+  } finally {
+    S.diagRunning = false; btn.disabled = false; btn.textContent = "Calibrate current zero";
+    if (wasPolling && elm.connected) pollLoop();
+  }
+}
+
 async function runDiagnostic() {
+  if (S.diagRunning || S.scanning) { logLine("another capture is already running", "err"); return; }
   if (!elm.connected) { logLine("connect first — diagnostic needs a live link", "err"); return; }
   const btn = $("btnDiag");
   const wasPolling = S.polling;
@@ -1351,7 +1484,8 @@ async function runDiagnostic() {
     put("did family     : " + (p.fam || "?") + "   header " + (p.hdr || "?") + "/" + (p.rx || "?"));
     put("session mode   : " + S.sessMode);
     put("current decode : iVar=" + (S.iVar == null ? "null (uncalibrated)" : S.iVar) +
-        "  stored=" + (store.get(ivarKey()) || "none") + "  key=" + ivarKey());
+        "  zero=" + (S.iZero != null ? S.iZero + " (calibrated)" : (S.iVar ? I_ZERO[S.iVar] + " (default)" : "?")) +
+        "  scale=" + I_SCALE + " A/bit  key=" + ivarKey());
     put("power state    : " + S.powerState + "   charging=" + S.charging);
     put("reads/misses   : " + S.reads + " / " + S.misses);
     put("blacklisted    : " + (Object.keys(S.badDids).join(",") || "none"));
@@ -1390,12 +1524,13 @@ async function runDiagnostic() {
 
     put("--- core DIDs, " + DIAG_ROUNDS + " rounds (raw hex) ---");
     put("round".padEnd(6) + "time".padEnd(8) + "  " + "state".padEnd(10) + "  " + DIAG_CORE.map(d => "$" + d).join(" "));
-    const i3401 = [];
+    const i3401 = [], lastRaw = {};
     for (let n = 1; n <= DIAG_ROUNDS; n++) {
       btn.textContent = "Round " + n + "/" + DIAG_ROUNDS + "…";
       const cells = [];
       for (const d of DIAG_CORE) {
         const r = await rawRead(d);
+        if (r.ok) lastRaw[d] = r.hex;
         if (d === "3401" && r.ok) i3401.push(r.hex.substr(0, 4));
         cells.push((r.ok ? r.hex : "----").padEnd(String("$" + d).length));
       }
@@ -1414,6 +1549,42 @@ async function runDiagnostic() {
     }
     put("");
 
+    /* pack sanity: the declared series count is checkable against the readings */
+    put("--- pack sanity ---");
+    const u16 = h => (h && h.length >= 4) ? parseInt(h.substr(0, 4), 16) : null;
+    const pvRaw = u16(lastRaw["3400"]), mxRaw = u16(lastRaw["3415"]), mnRaw = u16(lastRaw["3417"]);
+    if (pvRaw && mxRaw && mnRaw) {
+      const pv = pvRaw * 0.1 > 500 ? pvRaw * 0.01 : pvRaw * 0.1;
+      const avgCell = (mxRaw + mnRaw) / 2000;
+      put("pack " + pv.toFixed(1) + " V · cells " + (mxRaw / 1000).toFixed(3) + "/" + (mnRaw / 1000).toFixed(3) + " V");
+      put("implied series cells : " + (pv / avgCell).toFixed(1) + "   (profile declares " + (p.cells || "?") + ")");
+      put("spread              : " + (mxRaw - mnRaw) + " mV   (a steady max-cell NUMBER is expected above ~20 mV)");
+    }
+    const cn = k => lastRaw[k] ? parseInt(lastRaw[k].substr(0, 2), 16) : "—";   // 1-byte DIDs
+    put("max cell no $3419   : " + cn("3419") + "   min cell no $341A : " + cn("341A"));
+    put("(an index above the series count is a channel address, not a cell number)");
+    put("");
+
+    /* full family sweep — the one thing that needs physical access to the car */
+    btn.textContent = "Sweep…";
+    put("--- DID sweep $3400-$34FF ---");
+    put("every parameter this BMS answers, with payload length");
+    S.stShort = true;
+    await elm.send("ATST20", 600);
+    let nFound = 0;
+    for (let d = 0x3400; d <= 0x34FF; d++) {
+      if (d % 16 === 0) btn.textContent = "Sweep " + Math.round((d - 0x3400) / 2.56) + "%";
+      const hex = d.toString(16).toUpperCase().padStart(4, "0");
+      const payload = await sweepRead(hex);
+      if (payload != null && payload.length) {
+        nFound++;
+        put("$" + hex + " : " + (payload.length / 2) + " B  " + payload);
+      }
+    }
+    await elm.send("ATST32", 600); S.stShort = false;
+    put("(" + nFound + " DIDs answered)");
+    put("");
+
     put("--- app log tail ---");
     for (const [msg] of logBuf.slice(-60)) put(msg);
 
@@ -1424,6 +1595,8 @@ async function runDiagnostic() {
   } catch (e) {
     logLine("diagnostic failed: " + e.message, "err");
   } finally {
+    // a throw mid-sweep must not leave the adapter on the short response timeout
+    if (S.stShort) { S.stShort = false; try { await elm.send("ATST32", 600); } catch (e) {} }
     S.diagRunning = false;
     btn.disabled = false;
     btn.textContent = "Capture diagnostic log";
@@ -1468,8 +1641,8 @@ function render() {
   setT("vPackV", fmt(t.packV, 1));
   setT("vMaxV", t.maxV == null ? "—" : (t.maxV / 1000).toFixed(3));
   setT("vMinV", t.minV == null ? "—" : (t.minV / 1000).toFixed(3));
-  setT("vMaxN", "cell #" + (t.maxN ?? "—"));
-  setT("vMinN", "cell #" + (t.minN ?? "—"));
+  setT("vMaxN", cellNoText(t.maxN, "maxN"));
+  setT("vMinN", cellNoText(t.minN, "minN"));
   setT("vDelta", d == null ? "—" : String(Math.round(d)));
   setCol("vDelta", d == null ? "var(--sec)" : d > 100 ? "var(--crit)" : d > 40 ? "var(--warn)" : "var(--good)");
   setT("vBal", "Balance: " + (t.bal == null ? "—" :
@@ -1620,8 +1793,8 @@ function showChargeReport(r) {
         <span class="lbl" style="font-size:9.5px; font-weight:600; margin-left:auto; border-radius:999px; padding:3px 9px; ${top.delta > 60 ? "color:var(--crit); border:1px solid rgba(242,109,109,.4); background:rgba(242,109,109,.08);" : top.delta > 40 ? "color:var(--warn); border:1px solid rgba(245,183,61,.4); background:rgba(245,183,61,.08);" : "color:var(--good); border:1px solid rgba(63,214,140,.35); background:rgba(63,214,140,.1);"}">${top.delta > 60 ? "Check" : top.delta > 40 ? "Watch" : "Healthy"}</span>
       </div>
       <div style="display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px;">
-        <div><div class="lbl" style="font-size:9px; color:var(--mut);">Max cell</div><div class="num" style="font-size:13px; font-weight:600;">${cellV(top.maxV)} V</div><div class="num" style="font-size:9.5px; color:var(--good);">#${top.maxN ?? "—"}</div></div>
-        <div><div class="lbl" style="font-size:9px; color:var(--mut);">Min cell</div><div class="num" style="font-size:13px; font-weight:600;">${cellV(top.minV)} V</div><div class="num" style="font-size:9.5px; color:var(--crit);">#${top.minN ?? "—"}</div></div>
+        <div><div class="lbl" style="font-size:9px; color:var(--mut);">Max cell</div><div class="num" style="font-size:13px; font-weight:600;">${cellV(top.maxV)} V</div><div class="num" style="font-size:9.5px; color:var(--good);">${cellTag(top.maxN)}</div></div>
+        <div><div class="lbl" style="font-size:9px; color:var(--mut);">Min cell</div><div class="num" style="font-size:13px; font-weight:600;">${cellV(top.minV)} V</div><div class="num" style="font-size:9.5px; color:var(--crit);">${cellTag(top.minN)}</div></div>
         <div><div class="lbl" style="font-size:9px; color:var(--mut);">Pack</div><div class="num" style="font-size:13px; font-weight:600;">${fmt(top.packV,1)} V</div><div class="num" style="font-size:9.5px; color:var(--mut);">${top.packI != null ? Math.abs(top.packI).toFixed(1) + " A tail" : ""}</div></div>
       </div>
     </div>` : "";
@@ -1667,7 +1840,7 @@ function showChargeReport(r) {
         ${r.balEv.map(e =>
           `<span style="color:var(--sec);">${e.soc != null ? e.soc.toFixed(1) + "%" : "—"}</span>` +
           `<span style="color:var(--warn); font-weight:600;">${e.from} → ${e.to}</span>` +
-          `<span style="color:var(--mut);">max ${e.maxV != null ? (e.maxV / 1000).toFixed(3) : "—"} <span style="color:var(--good);">#${e.maxN ?? "—"}</span> · min ${e.minV != null ? (e.minV / 1000).toFixed(3) : "—"} <span style="color:var(--crit);">#${e.minN ?? "—"}</span></span>`
+          `<span style="color:var(--mut);">max ${e.maxV != null ? (e.maxV / 1000).toFixed(3) : "—"} <span style="color:var(--good);">${cellTag(e.maxN)}</span> · min ${e.minV != null ? (e.minV / 1000).toFixed(3) : "—"} <span style="color:var(--crit);">${cellTag(e.minN)}</span></span>`
         ).join("")}
       </div>
     </div>` : ""}
@@ -1819,10 +1992,12 @@ function renderReportsList() {
 /* ============================ Tools ============================ */
 async function scanRange() {
   if (S.scanning) { S.scanning = false; return; }
+  if (S.diagRunning) { logLine("another capture is already running", "err"); return; }
   const from = parseInt($("scanFrom").value, 16), to = parseInt($("scanTo").value, 16);
   if (isNaN(from) || isNaN(to) || to < from) return;
   const wasPolling = S.polling; S.polling = false; S.scanning = true; await waitPollExit();
   $("btnScan").textContent = "Stop";
+  try {
   await new Promise(r => setTimeout(r, 500));
   await elm.send("ATST20", 600);
   const tbody = $("scanTbl").querySelector("tbody");
@@ -1839,9 +2014,11 @@ async function scanRange() {
       tbody.appendChild(tr);
     }
   }
-  await elm.send("ATST32", 600);
-  S.scanning = false; $("btnScan").textContent = "Scan";
-  if (wasPolling) pollLoop();
+  } finally {
+    try { await elm.send("ATST32", 600); } catch (e) {}
+    S.scanning = false; $("btnScan").textContent = "Scan";
+    if (wasPolling && elm.connected) pollLoop();
+  }
 }
 
 async function readAllOnce() {
@@ -1910,6 +2087,7 @@ $("btnFocus").onclick = () => {
   render();
 };
 $("btnDiag").onclick = runDiagnostic;
+$("btnZero").onclick = calibrateZero;
 $("btnScan").onclick = scanRange;
 $("btnReadAll").onclick = readAllOnce;
 $("btnDisconnect").onclick = () => {

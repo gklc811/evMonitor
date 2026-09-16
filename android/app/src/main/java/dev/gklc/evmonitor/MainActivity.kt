@@ -92,8 +92,19 @@ class MainActivity : Activity() {
                     fun f(k: String, dp: Int = 1) = t.v(k)?.let { String.format("%.${dp}f", it) } ?: "—"
                     appendLine("SOC ${f("soc")} %    SOH ${f("soh")} %")
                     appendLine("Pack ${f("packV")} V   ${f("packI")} A")
-                    appendLine("Cell max ${t.v("maxV")?.div(1000)?.let { String.format("%.3f", it) } ?: "—"} V #${t.v("maxN")?.toInt() ?: "—"}")
-                    appendLine("Cell min ${t.v("minV")?.div(1000)?.let { String.format("%.3f", it) } ?: "—"} V #${t.v("minN")?.toInt() ?: "—"}")
+                    // implied series count from the readings — some BMSes report a channel
+                    // address here, not a 1..N index (Tigor: #144 on a 108-cell pack)
+                    // packV / LOWEST cell voltage is an upper bound on the series count
+                    // (the mean cell can only be higher), so a valid top index is never rejected
+                    val minCell = t.v("minV")?.takeIf { it > 0 }
+                    val nCells = if (minCell != null && t.v("packV") != null)
+                        (t.v("packV")!! / (minCell / 1000)).toInt() + 2 else 255
+                    fun cellNo(k: String): String {
+                        val n = t.v(k)?.toInt() ?: return "—"
+                        return if (n in 1..nCells) "$n" else "?($n)"
+                    }
+                    appendLine("Cell max ${t.v("maxV")?.div(1000)?.let { String.format("%.3f", it) } ?: "—"} V #${cellNo("maxN")}")
+                    appendLine("Cell min ${t.v("minV")?.div(1000)?.let { String.format("%.3f", it) } ?: "—"} V #${cellNo("minN")}")
                     appendLine("ΔV ${d?.toInt() ?: "—"} mV    12V ${f("lv", 2)}")
                     appendLine("Temp ${f("maxT", 0)}/${f("minT", 0)}/${f("avgT", 0)} °C   bal raw ${t.v("bal")?.toInt() ?: "—"}")
                 }

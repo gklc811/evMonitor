@@ -74,21 +74,55 @@ Conclusion: Tata's BMS firmware does not expose per-cell voltages over diagnosti
 ## Our own status
 - `../index.html` — working prototype (BLE ELM327 + Tata KPD DID polling + DID range scanner). Paused per Gokul's instruction; awaiting direction.
 
-## Field findings — KPD `$3401` current encoding (2026-09-16)
+## Field findings — KPD `$3401` current encoding (2026-09-16, revised)
 
-Two encodings exist in the KPD `$34xx` family. Both express the same −320 A offset; only the
-resolution differs (10×), and pack voltage `$3400` differs the opposite way:
+**The scale is always 0.1 A per bit. Only the raw value that means zero amps differs.**
 
-| Vehicle | `$3400` pack V | `$3401` current | idle raw |
-|---|---|---|---|
-| Punch EV LR 2024 (MAT833…) | raw × 0.01 | raw × 0.1 − 320 | 3200 |
-| Nexon.ev LR 40.5 facelift (MAT635…) | raw × 0.1 | raw × 0.01 − 320 | 32000 |
+| Vehicle | VIN prefix | `$3400` pack V | `$3401` zero raw | series cells |
+|---|---|---|---|---|
+| Punch EV LR 2024 | MAT833 | raw × 0.01 | 3200 | 102 |
+| Nexon.ev LR 40.5 facelift | MAT635 | raw × 0.1 | 32000 | 104 |
+| Tigor EV / XPRES-T | MAT562 | raw × 0.1 | 32000 | 108 |
 
-Evidence: Nexon parked, ignition on → `$3401 = 0x7D2E` (32046) with `$3400 = 0x0D7F` (345.5 V),
-cells 3.321/3.314 V at 92.4 % SOC ⇒ 104S; 0.01 A/bit gives +0.46 A (≈160 W of 12 V loads), the
-only physically sensible reading. TDS `KPD_EV_BMS.inf` documents 0.1 for both, matching neither
-car completely. Detection rule used by the app: any raw ≥ 10000 ⇒ 0.01 A/bit (a 0.1-res raw that
-high would be +680 A); twelve raws < 10000 while SOC is not rising ⇒ 0.1 A/bit.
-The earlier "gen-1 packs are two's-complement signed" note was an inference without raw data and
-is withdrawn; the Tigor is expected to be the 0.01 A/bit encoding — confirm from its diagnostic log.
-`$3479` on the Nexon LR read 0x10 (HVIL-detect bit only) vs 0x03/0x07 on the Punch.
+Current = (raw − zero) × 0.1. The two zero points are far apart and ±320 A of travel
+never crosses the gap, so a single valid sample identifies the family: raw ≤ 6400 ⇒
+zero 3200; raw 28800…35200 ⇒ zero 32000; anything between is a misparsed frame.
+
+**TDS agrees with the derived answer.** `KPD_EV_BMS.inf` documents `$3401` as
+resolution 0.1, **offset −3200**, range max raw 33535 — i.e. zero at 32000 and a top of
++153.5 A, which matches the Tigor EV's 55 kW motor at ~350 V almost exactly (its observed
+session peak was raw 33034 = +103.4 A). So the Nexon.ev LR and Tigor follow the dealer
+database, and **the Punch EV is the deviation**: it reports both current and pack voltage
+at 10× finer raw scaling than documented (zero 3200, and pack V ×0.01 rather than ×0.1).
+An earlier note here read the documented offset as −320; that was a transcription error.
+
+**Proof of the 0.1 scale** (Tigor driving capture, 2026-09-16). Regressing minimum cell
+voltage against raw current over eight rounds gives −0.0985 mV per count:
+
+| Assumed scale | Implied per-cell resistance | Verdict |
+|---|---|---|
+| 0.1 A/bit | 1.0 mΩ | textbook for a traction cell |
+| 0.01 A/bit | 10 mΩ | impossible — 27 kW of pack heating at full power |
+
+Independently, idle → driving average is only 62 counts. At 0.1 A/bit that is 2.2 kW of
+propulsion; at 0.01 it would be 0.22 kW, less than the headlights.
+
+**Withdrawn:** the earlier "gen-1 packs are two's-complement signed" note (inferred, never
+backed by raw data) and the 2026-09-16 morning claim that the Nexon/Tigor family uses
+0.01 A/bit with offset −320. That formula is exactly 1/10 of the correct value; it happened
+to look plausible because the Nexon capture was parked-only, where both readings are small.
+
+**Residual uncertainty: small.** Physics alone bounded the zero point to 31978…32067 from a
+parked capture; TDS independently documents 32000, and the two agree, so the constant is
+taken as settled. The app still offers a "Calibrate current zero" action (parked, A/C and
+lights off) to trim it per vehicle should a car deviate the way the Punch does.
+
+**Other per-vehicle differences seen:**
+- `$34D5` (ΔV) is unsupported on the Tigor (NRC 7F2231) — the app falls back to max − min.
+- `$3479` (balance flags) returns 2 bytes on the Tigor (0x1400) vs 1 byte on Punch (0x03/0x07)
+  and Nexon (0x10). The app reads the first byte, consistent with the one-byte cars.
+- `$3419` (max cell number) reports 144 on the Tigor's ~108-cell pack, and flips between 68,
+  80 and 144 while the physical maximum is steady — so it is a channel address, not a 1..N
+  index, on that car. `$341A` (min) reads a stable, plausible 13. The TDS row is flagged
+  shared with the ACE commercial platform, which would explain a wider address space.
+  The app now hides a cell number that exceeds the pack's series count.
