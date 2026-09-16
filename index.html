@@ -471,10 +471,16 @@ const TDS_FULL = [
   ["3400","Pack voltage",2,0.1,0,"V"],["3401","Pack current",2,0.1,-320,"A"],["3402","SOC",2,0.1,0,"%"],
   ["3403","SOH",2,0.1,0,"%"],["3409","Max cell temp",1,1,-40,"°C"],["340A","Max temp probe #",1,1,0,""],
   ["340B","Min cell temp",1,1,-40,"°C"],["340C","Min temp probe #",1,1,0,""],["3410","Coolant inlet",1,1,-40,"°C"],
-  ["3411","Coolant outlet",1,1,-40,"°C"],["3412","Avg temp",1,1,-40,"°C"],["3415","Max cell",2,1,0,"mV"],
+  ["3411","Coolant outlet",1,1,-40,"°C"],["3412","Avg temp",1,1,-40,"°C"],
+  ["3413","Insulation resistance",2,1,0,"kΩ"],["3415","Max cell",2,1,0,"mV"],
   ["3417","Min cell",2,1,0,"mV"],["3419","Max cell #",1,1,0,""],["341A","Min cell #",1,1,0,""],
   ["341B","Temp probes",1,1,0,""],["3479","Balance status",1,1,0,""],["347B","Chg current limit",2,0.1,0,"A"],
-  ["347C","Dischg current limit",2,0.1,0,"A"],["3481","Neg busbar",2,0.1,0,"V"],["3482","Pos busbar",2,0.1,0,"V"],
+  ["347C","Dischg current limit",2,0.1,0,"A"],
+  /* TDS names these "Power" but its Units column says A — the value itself settles it:
+     ~90 on a Punch means kW, ~280 means A. Shown with both until a car answers. */
+  ["347E","Peak discharge limit",2,0.1,0,"kW or A"],["347F","Peak regen limit",2,0.1,0,"kW or A"],
+  ["3481","Neg busbar",2,0.1,0,"V"],["3482","Pos busbar",2,0.1,0,"V"],
+  ["3484","Busbar voltage (MCU Vdc)",2,1,0,"V"],
   ["3492","12V supply",2,0.001,0,"V"],["34D5","Cell ΔV",2,1,0,"mV"],
 ];
 
@@ -2030,7 +2036,10 @@ async function readAllOnce() {
     let val = "—";
     if (bytes && bytes.length >= len) {
       let raw = 0; for (let i = 0; i < len; i++) raw = (raw << 8) | bytes[i];
-      val = (raw * f + o).toFixed(f < 1 ? 2 : 0) + " " + unit;
+      let v;
+      if (did === "3401") v = decodeCurrent(raw);                 // per-car zero point
+      else { v = raw * f + o; if (did === "3400" && v > 500) v = raw * 0.01; }
+      val = v == null ? "raw " + raw : v.toFixed(f < 1 ? 2 : 0) + " " + unit;
     }
     const tr = document.createElement("tr");
     tr.innerHTML = `<td style="color:var(--mut);">$${did}</td><td>${name}</td><td class="num" style="color:var(--good);">${val}</td>`;
