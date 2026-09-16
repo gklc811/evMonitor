@@ -85,6 +85,7 @@
   /* ---------- focus mode: every value, bigger; decorations hidden ---------- */
   body.focus #vPackR, body.focus #vPowerR, body.focus #vCurrR, body.focus #vMaxR, body.focus #vMinR,
   body.focus #vLvR, body.focus #vMaxTN, body.focus #vMinTN, body.focus #balChip,
+  body.focus #vPowLim, body.focus #vChgLim, body.focus #isoChip, body.focus #vCoolant,
   body.focus #socCard .meter, body.focus #socCard > div:last-child { display: none !important; }
   body.focus #vSoc { font-size: 54px !important; }
   body.focus #vSoh { font-size: 30px !important; }
@@ -199,12 +200,14 @@
       <span class="num" style="font-size: 21px; font-weight: 600;" id="vPower">—</span>
       <span class="num" style="font-size: 10px; color: var(--sec);">kW</span>
       <span class="num" style="font-size: 9.5px; color: var(--mut);" id="vPowerR"></span>
+      <span class="num" style="font-size: 9.5px; color: var(--sec);" id="vPowLim"></span>
     </div>
     <div class="card" style="padding: 11px 12px; display: flex; flex-direction: column; gap: 3px;">
       <div class="lbl tile-lbl">Current</div>
       <span class="num" style="font-size: 21px; font-weight: 600;" id="vCurr">—</span>
       <span class="num" style="font-size: 10px; color: var(--sec);">A</span>
       <span class="num" style="font-size: 9.5px; color: var(--mut);" id="vCurrR"></span>
+      <span class="num" style="font-size: 9.5px; color: var(--sec);" id="vChgLim"></span>
     </div>
     <div class="card" style="padding: 11px 12px; display: flex; flex-direction: column; gap: 3px;">
       <div class="lbl tile-lbl">Pack</div>
@@ -217,8 +220,13 @@
   <div class="card" id="cellsCard" style="padding: 13px 16px; display: flex; flex-direction: column; gap: 11px;">
     <div style="display: flex; justify-content: space-between; align-items: center;">
       <div class="lbl tile-lbl" style="font-size: 11px;">Cell voltages</div>
+      <div style="display: flex; align-items: center; gap: 6px;">
+      <div id="isoChip" class="hidden" style="display: flex; align-items: center; background: var(--panel2); border-radius: 999px; padding: 4px 10px;">
+        <span class="lbl" style="font-size: 10px; font-weight: 600;" id="vIso">ISO —</span>
+      </div>
       <div id="balChip" style="display: flex; align-items: center; gap: 6px; background: var(--panel2); border-radius: 999px; padding: 4px 10px;">
         <span class="lbl" style="font-size: 10px; font-weight: 600; color: var(--sec);" id="vBal">Balance: —</span>
+      </div>
       </div>
     </div>
     <div style="display: grid; grid-template-columns: 1.15fr 0.9fr 1.15fr; gap: 8px; align-items: start;">
@@ -270,6 +278,7 @@
         <span class="num" style="font-size: 21px; font-weight: 600;" id="vAvgT">—</span><span class="num" style="font-size: 11px; color: var(--sec);"> °C</span>
       </div>
     </div>
+    <div class="num" style="font-size: 10px; color: var(--sec);" id="vCoolant"></div>
   </div>
 
   <div class="card" id="lvCard" style="padding: 11px 14px; display: flex; justify-content: space-between; align-items: center;">
@@ -386,6 +395,12 @@ const FAMILIES = {
     avgT:  { did: "3412", bytes: 1, f: 1,     o: -40 },
     bal:   { did: "3479", bytes: 1, f: 1,     o: 0 },
     lv:    { did: "3492", bytes: 2, f: 0.001, o: 0 },
+    iso:   { did: "3413", bytes: 2, f: 1,     o: 0 },    // insulation resistance, kΩ
+    tIn:   { did: "3410", bytes: 1, f: 1,     o: -40 },  // coolant inlet
+    tOut:  { did: "3411", bytes: 1, f: 1,     o: -40 },  // coolant outlet
+    pOut:  { did: "347E", bytes: 2, f: 0.1,   o: 0 },    // allowed peak discharge
+    pReg:  { did: "347F", bytes: 2, f: 0.1,   o: 0 },    // allowed peak regen
+    iChg:  { did: "347B", bytes: 2, f: 0.1,   o: 0 },    // max allowed charge current, A
   },
   // Tata TacoGotion $30xx family (alt for some packs)
   tata30: {
@@ -437,7 +452,10 @@ const FAMILIES = {
   },
 };
 const FAST_KEYS = ["soc", "packV", "packI", "maxV", "minV", "maxN", "minN", "delta"];
-const SLOW_KEYS = ["soh", "maxT", "minT", "avgT", "maxTN", "minTN", "bal"];
+/* slow-moving: one per poll cycle, round-robin. Pack-health values change over minutes,
+   so sharing this rotation costs no extra bus traffic. */
+const SLOW_KEYS = ["soh", "maxT", "minT", "avgT", "maxTN", "minTN", "bal",
+                   "iso", "tIn", "tOut", "pOut", "pReg", "iChg"];
 
 /* ---------- vehicle profiles ---------- */
 const PROFILES = [
@@ -471,10 +489,16 @@ const TDS_FULL = [
   ["3400","Pack voltage",2,0.1,0,"V"],["3401","Pack current",2,0.1,-320,"A"],["3402","SOC",2,0.1,0,"%"],
   ["3403","SOH",2,0.1,0,"%"],["3409","Max cell temp",1,1,-40,"°C"],["340A","Max temp probe #",1,1,0,""],
   ["340B","Min cell temp",1,1,-40,"°C"],["340C","Min temp probe #",1,1,0,""],["3410","Coolant inlet",1,1,-40,"°C"],
-  ["3411","Coolant outlet",1,1,-40,"°C"],["3412","Avg temp",1,1,-40,"°C"],["3415","Max cell",2,1,0,"mV"],
+  ["3411","Coolant outlet",1,1,-40,"°C"],["3412","Avg temp",1,1,-40,"°C"],
+  ["3413","Insulation resistance",2,1,0,"kΩ"],["3415","Max cell",2,1,0,"mV"],
   ["3417","Min cell",2,1,0,"mV"],["3419","Max cell #",1,1,0,""],["341A","Min cell #",1,1,0,""],
   ["341B","Temp probes",1,1,0,""],["3479","Balance status",1,1,0,""],["347B","Chg current limit",2,0.1,0,"A"],
-  ["347C","Dischg current limit",2,0.1,0,"A"],["3481","Neg busbar",2,0.1,0,"V"],["3482","Pos busbar",2,0.1,0,"V"],
+  ["347C","Dischg current limit",2,0.1,0,"A"],
+  /* TDS names these "Power" but its Units column says A — the value itself settles it:
+     ~90 on a Punch means kW, ~280 means A. Shown with both until a car answers. */
+  ["347E","Peak discharge limit",2,0.1,0,"kW or A"],["347F","Peak regen limit",2,0.1,0,"kW or A"],
+  ["3481","Neg busbar",2,0.1,0,"V"],["3482","Pos busbar",2,0.1,0,"V"],
+  ["3484","Busbar voltage (MCU Vdc)",2,1,0,"V"],
   ["3492","12V supply",2,0.001,0,"V"],["34D5","Cell ΔV",2,1,0,"mV"],
 ];
 
@@ -667,6 +691,8 @@ const SANE = {
   maxV: [1000, 5000], minV: [1000, 5000], delta: [0, 2000],
   maxT: [-40, 125], minT: [-40, 125], avgT: [-40, 125], lv: [5, 20],
   maxN: [0, 255], minN: [0, 255], maxTN: [0, 64], minTN: [0, 64], bal: [0, 65535],
+  iso: [0, 65535], tIn: [-40, 125], tOut: [-40, 125],
+  pOut: [0, 1000], pReg: [0, 1000], iChg: [0, 1000],
 };
 function decodeEntry(e, bytes, key) {
   if (!bytes || bytes.length < e.bytes) return null;
@@ -728,7 +754,7 @@ function installNativeBridge() {
   elm.disconnect = () => { EvNative.disconnect(); elm.connected = false; };
 }
 
-const APP_VER = "1.4.3";
+const APP_VER = "1.4.4";
 
 const S = {
   profile: null, view: "connect", night: false, polling: false, scanning: false,
@@ -1653,6 +1679,26 @@ function render() {
   setT("vLvSub", lvS ? lvS.label : "");
   setT("vMaxT", fmt(t.maxT, 0)); setT("vMinT", fmt(t.minT, 0)); setT("vAvgT", fmt(t.avgT, 0));
   setT("vMaxTN", "probe " + (t.maxTN ?? "—")); setT("vMinTN", "probe " + (t.minTN ?? "—"));
+
+  /* pack-health values (Option A placement) */
+  setT("vCoolant", (t.tIn != null || t.tOut != null)
+    ? "coolant " + (t.tIn != null ? Math.round(t.tIn) : "—") + " → " + (t.tOut != null ? Math.round(t.tOut) : "—") + " °C" : "");
+  /* TDS names $347E/$347F "Power" but labels the unit amps. No Tata EV exceeds 200 kW,
+     so the magnitude itself says which it is — label it accordingly instead of guessing. */
+  if (t.pOut != null || t.pReg != null) {
+    const ref = t.pOut ?? t.pReg;
+    const f = v => v == null ? "—" : Math.round(v);
+    setT("vPowLim", "lim " + f(t.pOut) + "/" + f(t.pReg) + (ref <= 200 ? " kW" : " A"));
+  } else setT("vPowLim", "");
+  setT("vChgLim", t.iChg != null ? "chg ≤ " + Math.round(t.iChg) + " A" : "");
+  const iso = $("isoChip");
+  if (t.iso != null) {
+    iso.classList.remove("hidden");
+    setT("vIso", "ISO " + (t.iso >= 1000 ? (t.iso / 1000).toFixed(1) + " MΩ" : Math.round(t.iso) + " kΩ"));
+    // IEC/AIS threshold is 100 Ω per volt of pack; flag well before it is reached
+    const floorK = (t.packV != null ? t.packV : 350) * 0.1;
+    setCol("vIso", t.iso < floorK ? "var(--crit)" : t.iso < floorK * 4 ? "var(--warn)" : "var(--good)");
+  } else iso.classList.add("hidden");
   setT("vEOut", S.session.eOut.toFixed(2));
   setT("vEIn", S.session.eIn.toFixed(2));
   const trip = S.session.odoNow != null && S.session.odoStart != null ? S.session.odoNow - S.session.odoStart : null;
@@ -2030,7 +2076,10 @@ async function readAllOnce() {
     let val = "—";
     if (bytes && bytes.length >= len) {
       let raw = 0; for (let i = 0; i < len; i++) raw = (raw << 8) | bytes[i];
-      val = (raw * f + o).toFixed(f < 1 ? 2 : 0) + " " + unit;
+      let v;
+      if (did === "3401") v = decodeCurrent(raw);                 // per-car zero point
+      else { v = raw * f + o; if (did === "3400" && v > 500) v = raw * 0.01; }
+      val = v == null ? "raw " + raw : v.toFixed(f < 1 ? 2 : 0) + " " + unit;
     }
     const tr = document.createElement("tr");
     tr.innerHTML = `<td style="color:var(--mut);">$${did}</td><td>${name}</td><td class="num" style="color:var(--good);">${val}</td>`;

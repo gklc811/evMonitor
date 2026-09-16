@@ -107,6 +107,12 @@ class MainActivity : Activity() {
                     appendLine("Cell min ${t.v("minV")?.div(1000)?.let { String.format("%.3f", it) } ?: "—"} V #${cellNo("minN")}")
                     appendLine("ΔV ${d?.toInt() ?: "—"} mV    12V ${f("lv", 2)}")
                     appendLine("Temp ${f("maxT", 0)}/${f("minT", 0)}/${f("avgT", 0)} °C   bal raw ${t.v("bal")?.toInt() ?: "—"}")
+                    val iso = t.v("iso")
+                    val isoTxt = if (iso == null) "—" else if (iso >= 1000) String.format("%.1f MΩ", iso / 1000) else "${iso.toInt()} kΩ"
+                    // TDS names $347E/$347F "Power" but labels the unit amps; the magnitude decides
+                    val limUnit = if ((t.v("pOut") ?: t.v("pReg") ?: 0.0) <= 200.0) "kW" else "A"
+                    appendLine("Coolant ${f("tIn", 0)} → ${f("tOut", 0)} °C   ISO $isoTxt")
+                    appendLine("Limit ${f("pOut", 0)}/${f("pReg", 0)} $limUnit   chg ≤ ${f("iChg", 0)} A")
                 }
             }
         }
