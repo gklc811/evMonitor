@@ -426,15 +426,25 @@ object Engine {
         pollJob = scope.launch {
             var slow = 0
             var lastTP = 0L
+            var errRun = 0
             while (isActive && _state.value.connected) {
-                val vals = _state.value.values.toMutableMap()
-                for (b in DidMap.batches) readBatch(b, vals)
-                readOne(DidMap.slowKeys[slow++ % DidMap.slowKeys.size], vals)
-                if (sessMode == "extended" && System.currentTimeMillis() - lastTP > 2500) {
-                    send("3E80", 800); lastTP = System.currentTimeMillis()
+                try {
+                    val vals = _state.value.values.toMutableMap()
+                    for (b in DidMap.batches) readBatch(b, vals)
+                    readOne(DidMap.slowKeys[slow++ % DidMap.slowKeys.size], vals)
+                    if (sessMode == "extended" && System.currentTimeMillis() - lastTP > 2500) {
+                        send("3E80", 800); lastTP = System.currentTimeMillis()
+                    }
+                    update { it.copy(values = vals, reads = reads, misses = misses) }
+                    errRun = 0
+                    delay(150)
+                } catch (c: CancellationException) {
+                    throw c
+                } catch (e: Exception) {
+                    // one bad cycle must not end the session silently
+                    if (++errRun >= 10) { update { it.copy(status = "Polling stopped: ${e.message}") }; break }
+                    delay(400)
                 }
-                update { it.copy(values = vals, reads = reads, misses = misses) }
-                delay(150)
             }
         }
     }

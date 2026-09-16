@@ -754,7 +754,7 @@ function installNativeBridge() {
   elm.disconnect = () => { EvNative.disconnect(); elm.connected = false; };
 }
 
-const APP_VER = "1.4.4";
+const APP_VER = "1.4.5";
 
 const S = {
   profile: null, view: "connect", night: false, polling: false, scanning: false,
@@ -1055,8 +1055,10 @@ async function pollLoop() {
   S.session.start = S.session.start || Date.now();
   let lastTP = 0;
   const BATCHES = [["soc", "packV", "packI"], ["maxV", "minV", "maxN"], ["minN", "delta", "lv"]];
+  let errRun = 0;
   try {
     while (S.polling && elm.connected) {
+     try {
       for (const b of BATCHES) { if (!S.polling) break; await readBatch(b); render(); }
       if (!S.polling) break;                          // stop requested: no tail commands
       await readKey(SLOW_KEYS[slowIdx++ % SLOW_KEYS.length]);
@@ -1066,6 +1068,14 @@ async function pollLoop() {
       render();
       // odometer every 2 min, not while charging
       if (S.polling && !S.charging && Date.now() - S.lastOdoAt > 120000) { S.lastOdoAt = Date.now(); await readOdo(); }
+      errRun = 0;
+     } catch (e) {
+      /* One bad cycle must not end the session — that is how a display fault used to
+         stop polling outright while the header still read "Connected". */
+      if (++errRun === 1) logLine("poll cycle failed: " + e.message + " — retrying", "err");
+      if (errRun >= 10) { logLine("polling stopped after 10 consecutive failures", "err"); break; }
+      await new Promise(r => setTimeout(r, 400));
+     }
     }
   } finally {
     S.pollActive = false;
@@ -1230,12 +1240,11 @@ function tick() {
 /* Upper bound on a plausible cell index: the larger of the profile's declared count and
    what the readings imply (packV / lowest cell V), so a stale profile can't hide a real
    cell. 0 is allowed — some BMSes index from zero. */
-function cellOk(n) {
-  if (n == null) return false;
+function cellMax() {
   const implied = (S.t.packV && S.t.minV) ? Math.round(S.t.packV / (S.t.minV / 1000)) : 0;
-  const max = (Math.max((S.profile && S.profile.cells) || 0, implied) || 253) + 2;
-  return n >= 0 && n <= max;
+  return (Math.max((S.profile && S.profile.cells) || 0, implied) || 253) + 2;
 }
+function cellOk(n) { return n != null && n >= 0 && n <= cellMax(); }
 const cellTag = n => cellOk(n) ? "#" + Math.round(n) : "#—";
 function cellNoText(n, key) {
   if (S.cellNoBad[key]) return "cell —";
@@ -1245,7 +1254,7 @@ function cellNoText(n, key) {
      as 100S when it is 108S) must not hide a real cell. */
   if (cellOk(n)) return "cell #" + Math.round(n);
   S.cellNoBad[key] = 1;
-  logLine("cell numbering unreliable on this BMS (reported #" + Math.round(n) + " on a " + max + "-cell pack) — hiding it", "info");
+  logLine("cell numbering unreliable on this BMS (reported #" + Math.round(n) + " on a " + cellMax() + "-cell pack) — hiding it", "info");
   return "cell —";
 }
 function liveDelta() {
@@ -1653,8 +1662,15 @@ function setT(id, v) { if (_tc[id] !== v) { _tc[id] = v; $(id).textContent = v; 
 function setCol(id, c) { const k = "c:" + id; if (_tc[k] !== c) { _tc[k] = c; $(id).style.color = c; } }
 function setW(id, w) { const k = "w:" + id; if (_tc[k] !== w) { _tc[k] = w; $(id).style.width = w; } }
 
+let renderFailed = 0;
 function render() {
   if (document.hidden) return;              // no DOM work in background — recorder keeps sampling
+  try { renderBody(); } catch (e) {
+    // painting is never worth losing the link over: log once, keep polling
+    if (++renderFailed === 1) logLine("display error (data collection continues): " + e.message, "err");
+  }
+}
+function renderBody() {
   const t = S.t, d = liveDelta();
   setT("vSoc", fmt(t.soc, 1));
   setT("vSoh", fmt(t.soh, 1));
