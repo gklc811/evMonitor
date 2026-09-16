@@ -457,7 +457,7 @@ const VIN_TABLE = [
   [/^MAT832/, "tata_punch_ev_mr"], [/^MAT83[35]/, "tata_punch_ev_lr"], [/^MAT834/, "tata_punch_ev_40"],
   [/^MAT62[01]/, "tata_nexon_ev_prime"], [/^MAT62[23]/, "tata_nexon_ev_max"],
   [/^MAT624/, "tata_tiago_ev_mr"], [/^MAT625/, "tata_tiago_ev"],
-  [/^MAT636/, "tata_curvv_ev_55"], [/^MAT63/, "tata_nexon_ev_45"], [/^MAT61/, "tata_harrier_ev"],
+  [/^MAT636/, "tata_curvv_ev_55"], [/^MAT635/, "tata_nexon_ev_max"], [/^MAT63/, "tata_nexon_ev_45"], [/^MAT61/, "tata_harrier_ev"],
   [/^LGX/, "byd_atto_3"], [/^(MZ7|LSJ|MAJ|MEX)/, "mg_zs_ev"],
 ];
 
@@ -601,38 +601,33 @@ function udsPayload(resp, sid, id) {
   for (let j = 0; j + 1 < hex.length; j += 2) bytes.push(parseInt(hex.substr(j, 2), 16));
   return bytes;
 }
-/* Current ($3401) decode self-calibration.
-   Gen-2 packs (Punch): offset-binary — raw*0.1 − 320, idle raw ≈ 3200.
-   Some gen-1 packs (Tigor/Tiago): two's-complement signed — idle raw ≈ 0,
-   regen raw > 32767. Offset-binary raw can never legitimately be > 32767
-   (that would be +2950 A) or sit below ~1000 (−220 A sustained), so either
-   observation proves the signed encoding. Verdict is logged and remembered
-   per vehicle profile. */
+/* Current ($3401) decode self-calibration — see decodeCurrent() for the two field-confirmed encodings. */
 /* the current-decode verdict belongs to the CAR, not the profile: keyed by VIN when known */
 function ivarKey() { return "evm_ivar_" + (S.vin || (S.profile ? S.profile.id : "x")); }
 function decodeCurrent(raw) {
+  /* Field-confirmed KPD $3401 encodings (both zero at −320 A offset, resolution differs 10×):
+       "lo": raw × 0.1  − 320   → idle raw ≈ 3200   (Punch EV, 2024)
+       "hi": raw × 0.01 − 320   → idle raw ≈ 32000  (Nexon.ev LR facelift; expected on Tigor/Tiago)
+     A "lo" raw ≥ 10000 would mean +680 A, impossible; a "hi" raw < 10000 means < −220 A of charge,
+     which only a >75 kW DC session could produce. So one raw ≥ 10000 proves "hi", and twelve
+     raws < 10000 while SOC is not rising prove "lo". */
   if (S.iVar == null) {
     S.iRawSeen = (S.iRawSeen || 0) + 1;
-    if (S.iRawSeen === 1) { S.iLow = 0; S.iSoc0 = S.t.soc ?? null; }
-    if (raw < 1000) S.iLow++;
+    if (S.iRawSeen === 1) S.iSoc0 = S.t.soc ?? null;
     if (S.iRawSeen <= 3) logLine("packI raw sample: 0x" + raw.toString(16).toUpperCase().padStart(4, "0") + " (calibrating decode)", "info");
-    if (raw > 32767) {
-      S.iVar = "signed";                       // impossible in offset-binary: proof of two's-complement
+    if (raw >= 10000) {
+      S.iVar = "hi";
     } else if (S.iRawSeen >= 12) {
-      // raw < 1000 in offset-binary would mean < −220 A of CHARGE; twelve such samples with
-      // SOC not rising cannot be charging, so they must be small signed values
       const socRose = S.iSoc0 != null && S.t.soc != null && S.t.soc - S.iSoc0 >= 0.1;
-      if (S.iLow >= 12 && !socRose) S.iVar = "signed";
-      else if (S.iLow === 0) S.iVar = "offset";
-      else { S.iRawSeen = 0; logLine("current decode ambiguous (heavy charging?) — sampling again", "info"); }
+      if (!socRose) S.iVar = "lo";
+      else { S.iRawSeen = 0; logLine("current decode ambiguous while charging — sampling again", "info"); }
     }
     if (S.iVar) {
       store.set(ivarKey(), S.iVar);
-      logLine("current decode calibrated: " + S.iVar + (S.iVar === "signed" ? " (gen-1 style)" : " (gen-2 style)"), "ok");
+      logLine("current decode calibrated: " + (S.iVar === "hi" ? "0.01 A/bit, idle at 32000 (Nexon/Tigor style)" : "0.1 A/bit, idle at 3200 (Punch style)"), "ok");
     }
   }
-  if (S.iVar === "signed") return (raw > 32767 ? raw - 65536 : raw) * 0.1;
-  return raw * 0.1 - 320;
+  return S.iVar === "hi" ? raw * 0.01 - 320 : raw * 0.1 - 320;
 }
 
 function decodeEntry(e, bytes, key) {
@@ -693,7 +688,7 @@ function installNativeBridge() {
   elm.disconnect = () => { EvNative.disconnect(); elm.connected = false; };
 }
 
-const APP_VER = "1.4.1";
+const APP_VER = "1.4.2";
 
 const S = {
   profile: null, view: "connect", night: false, polling: false, scanning: false,
@@ -701,7 +696,7 @@ const S = {
   reads: 0, misses: 0,
   session: { start: 0, eOut: 0, eIn: 0, eRegen: 0, lastT: 0, lastP: 0, lastIAt: 0, odoStart: null, odoNow: null, range: {} },
   vin: null, pollActive: false, pollExit: null, diagRunning: false, userDisc: false,
-  iLow: 0, iSoc0: null,
+  iSoc0: null,
   charging: false, chargeStreak: 0, idleStreak: 0,
   powerState: "idle", pendState: "idle", pendStreak: 0, powerEma: null,
   rec: null,                               // active 95-100% AC recording window
@@ -828,7 +823,8 @@ function vinFrom(bytes) {
 }
 function setProfile(prof, how) {
   S.profile = prof;
-  S.iVar = store.get(ivarKey()) || null;               // per-vehicle current decode (VIN-keyed when known)
+  const sv = store.get(ivarKey());                     // per-vehicle current decode (VIN-keyed when known)
+  S.iVar = sv === "offset" ? "lo" : (sv === "lo" || sv === "hi") ? sv : null;
   S.iRawSeen = 0;
   S.badDids = {};                                      // NRC blacklist is per vehicle/session
   store.set("evm_profile", prof.id);
@@ -1321,7 +1317,8 @@ function diagCandidates(rawHex) {
   const s = raw > 32767 ? raw - 65536 : raw;
   return [
     ["raw u16", raw],
-    ["KPD   (raw*0.1 - 320)", raw * 0.1 - 320],
+    ["KPD-lo (raw*0.1 - 320)", raw * 0.1 - 320],
+    ["KPD-hi (raw*0.01 - 320)", raw * 0.01 - 320],
     ["Taco  (raw*0.1 - 60)", raw * 0.1 - 60],
     ["CESL  (raw*0.5 - 500)", raw * 0.5 - 500],
     ["HECU  (raw*1   - 500)", raw - 500],

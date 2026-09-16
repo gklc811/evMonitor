@@ -87,11 +87,9 @@ object Engine {
     private var reads = 0L
     private var misses = 0L
     private var sessMode = "default"
-    /* current ($3401) decode self-calibration: offset-binary raw can never be
-       >32767 or <1000; seeing either proves gen-1 two's-complement encoding */
-    private var iSigned = false
+    /* current ($3401) decode self-calibration: two field-confirmed KPD encodings, see decode() */
+    private var iHiRes = false
     private var iSeen = 0
-    private var iLow = 0
     private var iDecided = false
     private var userDisconnect = false
     /* raw transport mode (rich flavor): the WebView UI drives the ELM/UDS protocol */
@@ -311,16 +309,10 @@ object Engine {
         var raw = 0L
         for (i in 0 until e.bytes) raw = (raw shl 8) or hex.substring(i * 2, i * 2 + 2).toLong(16)
         if (e.did == "3401") {
-            if (!iDecided) {
-                iSeen++; if (raw < 1000) iLow++
-                if (raw > 32767) { iSigned = true; iDecided = true }          // impossible in offset-binary: proof
-                else if (iSeen >= 12) {
-                    if (iLow >= 12) { iSigned = true; iDecided = true }       // twelve "< −220 A" readings: small signed values
-                    else if (iLow == 0) iDecided = true                       // plain offset-binary
-                    else { iSeen = 0; iLow = 0 }                              // mixed (heavy charging?): sample again
-                }
-            }
-            return if (iSigned) (if (raw > 32767) raw - 65536 else raw) * 0.1 else raw * 0.1 - 320.0
+            // KPD $3401: raw×0.1−320 (idle 3200, Punch) or raw×0.01−320 (idle 32000, Nexon LR / Tigor).
+            // A 0.1-res raw ≥ 10000 would be +680 A: impossible, so one such sample proves the 0.01 encoding.
+            if (!iDecided) { iSeen++; if (raw >= 10000) { iHiRes = true; iDecided = true } else if (iSeen >= 12) iDecided = true }
+            return if (iHiRes) raw * 0.01 - 320.0 else raw * 0.1 - 320.0
         }
         var v = raw * e.f + e.o
         if (e.sanity500 && v > 500) v = raw * 0.01

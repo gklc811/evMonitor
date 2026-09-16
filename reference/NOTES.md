@@ -73,3 +73,22 @@ Conclusion: Tata's BMS firmware does not expose per-cell voltages over diagnosti
 
 ## Our own status
 - `../index.html` — working prototype (BLE ELM327 + Tata KPD DID polling + DID range scanner). Paused per Gokul's instruction; awaiting direction.
+
+## Field findings — KPD `$3401` current encoding (2026-09-16)
+
+Two encodings exist in the KPD `$34xx` family. Both express the same −320 A offset; only the
+resolution differs (10×), and pack voltage `$3400` differs the opposite way:
+
+| Vehicle | `$3400` pack V | `$3401` current | idle raw |
+|---|---|---|---|
+| Punch EV LR 2024 (MAT833…) | raw × 0.01 | raw × 0.1 − 320 | 3200 |
+| Nexon.ev LR 40.5 facelift (MAT635…) | raw × 0.1 | raw × 0.01 − 320 | 32000 |
+
+Evidence: Nexon parked, ignition on → `$3401 = 0x7D2E` (32046) with `$3400 = 0x0D7F` (345.5 V),
+cells 3.321/3.314 V at 92.4 % SOC ⇒ 104S; 0.01 A/bit gives +0.46 A (≈160 W of 12 V loads), the
+only physically sensible reading. TDS `KPD_EV_BMS.inf` documents 0.1 for both, matching neither
+car completely. Detection rule used by the app: any raw ≥ 10000 ⇒ 0.01 A/bit (a 0.1-res raw that
+high would be +680 A); twelve raws < 10000 while SOC is not rising ⇒ 0.1 A/bit.
+The earlier "gen-1 packs are two's-complement signed" note was an inference without raw data and
+is withdrawn; the Tigor is expected to be the 0.01 A/bit encoding — confirm from its diagnostic log.
+`$3479` on the Nexon LR read 0x10 (HVIL-detect bit only) vs 0x03/0x07 on the Punch.
