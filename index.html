@@ -63,7 +63,7 @@
   #viewDash { display: flex; flex-direction: column; gap: 11px; flex: 1; padding-top: 12px; }
   .hdr { display: flex; justify-content: space-between; align-items: center; }
   .pill { display: flex; align-items: center; gap: 7px; background: var(--panel); border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px; }
-  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--crit); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warn); box-shadow: 0 0 6px rgba(245,183,61,0.5); }
   .dot.on { background: var(--good); box-shadow: 0 0 6px var(--good); }
   .iconbtn { width: 36px; height: 36px; min-height: 36px; padding: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
   .tile-lbl { font-size: 10px; font-weight: 600; color: var(--mut); }
@@ -157,16 +157,11 @@
 
 <!-- ================= DASHBOARD (day) ================= -->
 <div id="viewDash" class="hidden">
-  <div class="hdr">
-    <div>
-      <div class="lbl" style="font-size: 19px; font-weight: 700;" id="dashCar">Punch EV</div>
-      <div class="lbl" style="font-size: 11px; font-weight: 500; color: var(--mut);" id="dashSub">BMS Live · 785/78D</div>
-    </div>
-    <div style="display: flex; align-items: center; gap: 8px;">
-      <div class="pill"><span class="dot" id="connDot"></span><span class="lbl" style="font-size: 11px; font-weight: 600; color: var(--sec);" id="connTxt">—</span></div>
-      <button class="iconbtn" id="btnReports" title="Reports" style="position: relative;"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="#93a1b8" stroke-width="1.4"><path d="M3 2h10v12H3z M5.5 5.5h5 M5.5 8h5 M5.5 10.5h3"></path></svg><span id="repDot" class="hidden" style="position: absolute; top: 3px; right: 3px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 5px var(--accent);"></span></button>
-      <div class="pill" title="wake lock"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#f5b73d" stroke-width="1.4"><circle cx="8" cy="8" r="3"></circle><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M12.6 3.4l-1.4 1.4M4.8 11.2l-1.4 1.4"></path></svg><span class="lbl" style="font-size: 10px; font-weight: 600; color: var(--sec);" id="wakeState">Screen —</span></div>
-    </div>
+  <!-- The top bar is gone. These four still receive writes from the connect flow,
+       the session prober and the wake-lock handler, so they stay in the DOM unrendered
+       rather than scattering null-guards through code that has no other reason to change. -->
+  <div class="hidden">
+    <span id="dashCar"></span><span id="dashSub"></span><span id="connTxt">—</span><span id="wakeState"></span>
   </div>
 
   <div class="card" id="socCard" style="padding: 15px 16px 13px; display: flex; flex-direction: column; gap: 10px;">
@@ -261,7 +256,10 @@
   </div>
 
   <div class="card" id="tempCard" style="padding: 13px 16px; display: flex; flex-direction: column; gap: 9px;">
-    <div class="lbl tile-lbl" style="font-size: 11px;">Battery temperature</div>
+    <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px;">
+      <div class="lbl tile-lbl" style="font-size: 11px;">Battery temperature</div>
+      <div class="num" style="font-size: 10px; color: var(--sec);" id="vCoolant"></div>
+    </div>
     <div class="grid3">
       <div>
         <div class="lbl tile-lbl">Max</div>
@@ -278,38 +276,29 @@
         <span class="num" style="font-size: 21px; font-weight: 600;" id="vAvgT">—</span><span class="num" style="font-size: 11px; color: var(--sec);"> °C</span>
       </div>
     </div>
-    <div class="num" style="font-size: 10px; color: var(--sec);" id="vCoolant"></div>
   </div>
 
-  <div class="card" id="lvCard" style="padding: 11px 14px; display: flex; justify-content: space-between; align-items: center;">
-    <div class="lbl tile-lbl" style="font-size: 11px;">12V battery</div>
-    <div style="display: flex; align-items: baseline; gap: 6px;">
-      <span class="num" style="font-size: 20px; font-weight: 600;" id="vLv">—</span>
-      <span class="num" style="font-size: 11px; color: var(--sec);">V</span>
-      <span class="num" style="font-size: 10px; color: var(--mut);" id="vLvSub"></span>
-      <span class="num" style="font-size: 9.5px; color: var(--mut);" id="vLvR"></span>
-    </div>
-  </div>
-
-  <div class="card" id="sessCard" style="padding: 10px 14px; display: flex; justify-content: space-between; align-items: center;">
-    <div><div class="lbl" style="font-size: 9.5px; color: var(--mut);">Session out</div><span class="num" style="font-size: 14px; font-weight: 600;" id="vEOut">—</span><span class="num" style="font-size: 10px; color: var(--sec);"> kWh</span></div>
+  <div class="card" id="sessCard" style="padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+    <div><div class="lbl" style="font-size: 9.5px; color: var(--mut);">12 V</div><span class="num" style="font-size: 14px; font-weight: 600;" id="vLv">—</span><span class="num" style="font-size: 10px; color: var(--sec);"> V</span><span class="hidden" id="vLvSub"></span><span class="hidden" id="vLvR"></span></div>
+    <div><div class="lbl" style="font-size: 9.5px; color: var(--mut);">Out</div><span class="num" style="font-size: 14px; font-weight: 600;" id="vEOut">—</span><span class="num" style="font-size: 10px; color: var(--sec);"> kWh</span></div>
     <div><div class="lbl" style="font-size: 9.5px; color: var(--mut);">In</div><span class="num" style="font-size: 14px; font-weight: 600;" id="vEIn">—</span><span class="num" style="font-size: 10px; color: var(--sec);"> kWh</span></div>
     <div><div class="lbl" style="font-size: 9.5px; color: var(--mut);">Efficiency</div><span class="num" style="font-size: 14px; font-weight: 600;" id="vWhKm">—</span><span class="num" style="font-size: 10px; color: var(--sec);"> Wh/km</span></div>
     <div style="text-align: right;"><div class="lbl" style="font-size: 9.5px; color: var(--mut);">Trip</div><span class="num" style="font-size: 14px; font-weight: 600;" id="vTrip">—</span><span class="num" style="font-size: 10px; color: var(--sec);"> km</span></div>
   </div>
 
-  <div class="foot" style="margin-top: auto; display: flex; justify-content: space-between; align-items: center; padding: 2px;">
-    <span class="num" style="font-size: 10px; color: var(--mut);" id="pollStats">—</span>
-    <div style="display: flex; gap: 8px;">
-      <button class="ghost" style="min-height: 30px; padding: 4px 10px; font-size: 11px;" id="btnPause">Pause</button>
-      <span style="display: flex; gap: 8px;">
-      <button class="ghost" style="min-height: 30px; padding: 4px 12px; font-size: 11px;" id="btnFocus">Focus</button>
-      <button class="ghost" style="min-height: 30px; padding: 4px 12px; font-size: 11px; color: #8fc2ff; border-color: rgba(143,194,255,0.4);" id="btnChart">Chart</button>
-      <button class="ghost" style="min-height: 30px; padding: 4px 12px; font-size: 11px;" id="btnTools">Tools</button>
+  <div class="foot" style="margin-top: auto; display: flex; justify-content: space-between; align-items: center; padding: 2px; gap: 8px;">
+    <span style="display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1 1 auto;">
+      <span class="dot" id="connDot" title="link"></span>
+      <span class="num" style="font-size: 9.5px; color: var(--mut); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="pollStats">—</span>
     </span>
-    </div>
+    <span style="display: flex; gap: 8px;">
+      <button class="ghost" style="min-height: 30px; padding: 4px 10px; font-size: 10.5px; position: relative;" id="btnReports">Summary<span id="repDot" class="hidden" style="position: absolute; top: 2px; right: 2px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 5px var(--accent);"></span></button>
+      <button class="ghost" style="min-height: 30px; padding: 4px 10px; font-size: 10.5px;" id="btnFocus">Focus</button>
+      <button class="ghost" style="min-height: 30px; padding: 4px 10px; font-size: 10.5px; color: #8fc2ff; border-color: rgba(143,194,255,0.4);" id="btnChart">Chart</button>
+      <button class="ghost" style="min-height: 30px; padding: 4px 10px; font-size: 10.5px;" id="btnTools">Tools</button>
+    </span>
   </div>
-</div>
+
 
 <!-- ================= REPORT SHEET ================= -->
 <div class="overlay hidden" id="ovReport">
@@ -754,7 +743,7 @@ function installNativeBridge() {
   elm.disconnect = () => { EvNative.disconnect(); elm.connected = false; };
 }
 
-const APP_VER = "1.4.6";
+const APP_VER = "1.5.0";
 
 const S = {
   profile: null, view: "connect", night: false, polling: false, scanning: false,
@@ -905,7 +894,8 @@ function setProfile(prof, how) {
   $("detHow").textContent = how;
   $("dashCar").textContent = prof.name.split(" (")[0];
   $("dashSub").textContent = `BMS Live · ${prof.hdr}/${prof.rx}`;
-  $("vPackSpec").textContent = `${prof.kwh} kWh · ` + (prof.cells ? `${prof.cells}S ${prof.chem.split(" ")[0]}` : prof.chem);
+  // with the title bar gone this line is the only thing naming the car
+  $("vPackSpec").textContent = `${prof.name.split(" (")[0]} · ${prof.kwh} kWh` + (prof.cells ? ` · ${prof.cells}S` : "");
 }
 function chargeLossWatchdog() {
   if (!S.charging) return;
@@ -1665,7 +1655,17 @@ function lvStatus(v) {
   return { label: "resting", color: "var(--ink)", bad: false, tag: "" };
 }
 const _tc = {};
-function setT(id, v) { if (_tc[id] !== v) { _tc[id] = v; $(id).textContent = v; } }
+/* A value turning up or going away changes the panel's height. The fit engine used to
+   re-measure only on rotation and view changes, so lines that arrive seconds after
+   connecting (the limits, coolant, insulation) pushed the buttons off the bottom instead
+   of everything scaling. Flag it here and the render pass re-fits once. */
+let needFit = false;
+function setT(id, v) {
+  if (_tc[id] === v) return;
+  const had = _tc[id] !== undefined && _tc[id] !== "";
+  _tc[id] = v; $(id).textContent = v;
+  if (had !== (v !== "")) needFit = true;
+}
 function setCol(id, c) { const k = "c:" + id; if (_tc[k] !== c) { _tc[k] = c; $(id).style.color = c; } }
 function setW(id, w) { const k = "w:" + id; if (_tc[k] !== w) { _tc[k] = w; $(id).style.width = w; } }
 
@@ -1716,12 +1716,13 @@ function renderBody() {
   setT("vChgLim", t.iChg != null ? "chg ≤ " + Math.round(t.iChg) + " A" : "");
   const iso = $("isoChip");
   if (t.iso != null) {
+    if (iso.classList.contains("hidden")) needFit = true;
     iso.classList.remove("hidden");
     setT("vIso", "ISO " + (t.iso >= 1000 ? (t.iso / 1000).toFixed(1) + " MΩ" : Math.round(t.iso) + " kΩ"));
     // IEC/AIS threshold is 100 Ω per volt of pack; flag well before it is reached
     const floorK = (t.packV != null ? t.packV : 350) * 0.1;
     setCol("vIso", t.iso < floorK ? "var(--crit)" : t.iso < floorK * 4 ? "var(--warn)" : "var(--good)");
-  } else iso.classList.add("hidden");
+  } else { if (!iso.classList.contains("hidden")) needFit = true; iso.classList.add("hidden"); }
   setT("vEOut", S.session.eOut.toFixed(2));
   setT("vEIn", S.session.eIn.toFixed(2));
   const trip = S.session.odoNow != null && S.session.odoStart != null ? S.session.odoNow - S.session.odoStart : null;
@@ -1742,7 +1743,13 @@ function renderBody() {
     setT("liveAmp", t.packI != null ? Math.abs(t.packI).toFixed(1) + " A" : "");
     setT("liveEIn", (S.charging ? (S.session.eIn - (S.chgm ? S.chgm.eInStart : 0)) : S.session.eOut).toFixed(2) + " kWh");
   }
-  setT("pollStats", `${S.reads} reads · ${S.misses} misses`);
+  if (needFit) { needFit = false; queueFit(); }
+  /* the dot carries the link; the text only names a state worth acting on */
+  const link = $("connTxt").textContent;
+  const rd = S.reads >= 10000 ? (S.reads / 1000).toFixed(1) + "k" : String(S.reads);
+  setT("pollStats", `${rd} reads · ${S.misses} miss`
+    + (elm.connected ? "" : " · " + (link && link !== "—" ? link.toLowerCase() : "not connected"))
+    + (wakeHeld ? "" : " · no wake"));
   if (_tc["conn"] !== elm.connected) {
     _tc["conn"] = elm.connected;
     $("connDot").classList.toggle("on", elm.connected);
@@ -2130,19 +2137,6 @@ $("selProfile").onchange = () => {
 $("btnConnect").onclick = () => connectFlow(false);
 $("btnStart").onclick = startMonitoring;
 $("btnTools").onclick = () => { openSheet($("ovTools")); renderLog(); };
-$("btnPause").onclick = async () => {
-  if (S.polling) {
-    S.polling = false;
-    $("btnPause").textContent = "Resume";
-    $("connTxt").textContent = "Paused";
-    logLine("diagnostics paused — bus silent (any diag session expires in ~5 s)", "info");
-  } else if (elm.connected) {
-    $("btnPause").textContent = "Pause";
-    $("connTxt").textContent = "Connected";
-    await establishSession(S.profile);
-    if (!S.polling) pollLoop();
-  }
-};
 $("btnToolsClose").onclick = () => closeSheets();
 $("btnReports").onclick = () => {
   $("repDot").classList.add("hidden"); S.pendingReport = null;
