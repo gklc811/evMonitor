@@ -110,9 +110,13 @@ class MainActivity : Activity() {
                     val iso = t.v("iso")
                     val isoTxt = if (iso == null) "—" else if (iso >= 1000) String.format("%.1f MΩ", iso / 1000) else "${iso.toInt()} kΩ"
                     // TDS names $347E/$347F "Power" but labels the unit amps; the magnitude decides
-                    val limUnit = if ((t.v("pOut") ?: t.v("pReg") ?: 0.0) <= 200.0) "kW" else "A"
+                    val pv = t.v("packV")
+                    fun kw(key: String): String {
+                        val a = t.v(key); val v = pv
+                        return if (a == null || v == null) "—" else String.format("%.0f", a * v / 1000)
+                    }
                     appendLine("Coolant ${f("tIn", 0)} → ${f("tOut", 0)} °C   ISO $isoTxt")
-                    appendLine("Limit ${f("pOut", 0)}/${f("pReg", 0)} $limUnit   chg ≤ ${f("iChg", 0)} A")
+                    appendLine("Limit ${kw("iDis")}/${kw("iChg")} kW   chg <= ${f("iChg", 0)} A")
                 }
             }
         }

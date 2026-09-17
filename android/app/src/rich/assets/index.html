@@ -398,9 +398,9 @@ const FAMILIES = {
     iso:   { did: "3413", bytes: 2, f: 1,     o: 0 },    // insulation resistance, kΩ
     tIn:   { did: "3410", bytes: 1, f: 1,     o: -40 },  // coolant inlet
     tOut:  { did: "3411", bytes: 1, f: 1,     o: -40 },  // coolant outlet
-    pOut:  { did: "347E", bytes: 2, f: 0.1,   o: 0 },    // allowed peak discharge
-    pReg:  { did: "347F", bytes: 2, f: 0.1,   o: 0 },    // allowed peak regen
     iChg:  { did: "347B", bytes: 2, f: 0.1,   o: 0 },    // max allowed charge current, A
+    iDis:  { did: "347C", bytes: 2, f: 0.1,   o: 0 },    // max allowed discharge current, A
+    probeN:{ did: "341B", bytes: 1, f: 1,     o: 0 },    // how many temp probes exist
   },
   // Tata TacoGotion $30xx family (alt for some packs)
   tata30: {
@@ -455,7 +455,7 @@ const FAST_KEYS = ["soc", "packV", "packI", "maxV", "minV", "maxN", "minN", "del
 /* slow-moving: one per poll cycle, round-robin. Pack-health values change over minutes,
    so sharing this rotation costs no extra bus traffic. */
 const SLOW_KEYS = ["soh", "maxT", "minT", "avgT", "maxTN", "minTN", "bal",
-                   "iso", "tIn", "tOut", "pOut", "pReg", "iChg"];
+                   "iso", "tIn", "tOut", "iChg", "iDis", "probeN"];
 
 /* ---------- vehicle profiles ---------- */
 const PROFILES = [
@@ -692,7 +692,7 @@ const SANE = {
   maxT: [-40, 125], minT: [-40, 125], avgT: [-40, 125], lv: [5, 20],
   maxN: [0, 255], minN: [0, 255], maxTN: [0, 64], minTN: [0, 64], bal: [0, 65535],
   iso: [0, 65535], tIn: [-40, 125], tOut: [-40, 125],
-  pOut: [0, 1000], pReg: [0, 1000], iChg: [0, 1000],
+  iChg: [0, 2000], iDis: [0, 2000], probeN: [0, 64],
 };
 function decodeEntry(e, bytes, key) {
   if (!bytes || bytes.length < e.bytes) return null;
@@ -754,7 +754,7 @@ function installNativeBridge() {
   elm.disconnect = () => { EvNative.disconnect(); elm.connected = false; };
 }
 
-const APP_VER = "1.4.5";
+const APP_VER = "1.4.6";
 
 const S = {
   profile: null, view: "connect", night: false, polling: false, scanning: false,
@@ -1240,6 +1240,13 @@ function tick() {
 /* Upper bound on a plausible cell index: the larger of the profile's declared count and
    what the readings imply (packV / lowest cell V), so a stale profile can't hide a real
    cell. 0 is allowed — some BMSes index from zero. */
+/* $340A/$340C name a temperature probe and $341B says how many exist. The Tigor reports
+   probe 8 on a 6-probe pack, so bound it exactly the way cell numbers are bounded. */
+function probeText(n) {
+  if (n == null) return "probe —";
+  const max = S.t.probeN || 64;
+  return (n >= 1 && n <= max) ? "probe " + Math.round(n) : "probe —";
+}
 function cellMax() {
   const implied = (S.t.packV && S.t.minV) ? Math.round(S.t.packV / (S.t.minV / 1000)) : 0;
   return (Math.max((S.profile && S.profile.cells) || 0, implied) || 253) + 2;
@@ -1694,17 +1701,17 @@ function renderBody() {
   setCol("vLv", lvS ? lvS.color : "var(--ink)");
   setT("vLvSub", lvS ? lvS.label : "");
   setT("vMaxT", fmt(t.maxT, 0)); setT("vMinT", fmt(t.minT, 0)); setT("vAvgT", fmt(t.avgT, 0));
-  setT("vMaxTN", "probe " + (t.maxTN ?? "—")); setT("vMinTN", "probe " + (t.minTN ?? "—"));
+  setT("vMaxTN", probeText(t.maxTN)); setT("vMinTN", probeText(t.minTN));
 
   /* pack-health values (Option A placement) */
   setT("vCoolant", (t.tIn != null || t.tOut != null)
     ? "coolant " + (t.tIn != null ? Math.round(t.tIn) : "—") + " → " + (t.tOut != null ? Math.round(t.tOut) : "—") + " °C" : "");
-  /* TDS names $347E/$347F "Power" but labels the unit amps. No Tata EV exceeds 200 kW,
-     so the magnitude itself says which it is — label it accordingly instead of guessing. */
-  if (t.pOut != null || t.pReg != null) {
-    const ref = t.pOut ?? t.pReg;
-    const f = v => v == null ? "—" : Math.round(v);
-    setT("vPowLim", "lim " + f(t.pOut) + "/" + f(t.pReg) + (ref <= 200 ? " kW" : " A"));
+  /* Derived from the two CURRENT limits, which TDS states unambiguously in amps, times the
+     live pack voltage. $347D-$3480 are named "Power" but labelled amps and read 9.1 on a
+     55 kW Tigor, so they stay in Tools rather than being shown as fact on the panel. */
+  if (t.packV != null && (t.iDis != null || t.iChg != null)) {
+    const kw = a => a == null ? "—" : Math.round(a * t.packV / 1000);
+    setT("vPowLim", "lim " + kw(t.iDis) + "/" + kw(t.iChg) + " kW");
   } else setT("vPowLim", "");
   setT("vChgLim", t.iChg != null ? "chg ≤ " + Math.round(t.iChg) + " A" : "");
   const iso = $("isoChip");

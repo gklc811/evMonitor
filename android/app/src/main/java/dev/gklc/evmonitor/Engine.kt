@@ -49,14 +49,14 @@ object DidMap {
         "iso"   to DidEntry("3413", 2, 1.0, 0.0, lo = 0.0, hi = 65535.0),      // insulation, kOhm
         "tIn"   to DidEntry("3410", 1, 1.0, -40.0, lo = -40.0, hi = 125.0),    // coolant inlet
         "tOut"  to DidEntry("3411", 1, 1.0, -40.0, lo = -40.0, hi = 125.0),    // coolant outlet
-        "pOut"  to DidEntry("347E", 2, 0.1, 0.0, lo = 0.0, hi = 1000.0),       // allowed peak discharge
-        "pReg"  to DidEntry("347F", 2, 0.1, 0.0, lo = 0.0, hi = 1000.0),       // allowed peak regen
-        "iChg"  to DidEntry("347B", 2, 0.1, 0.0, lo = 0.0, hi = 1000.0),       // max charge current, A
+        "iChg"  to DidEntry("347B", 2, 0.1, 0.0, lo = 0.0, hi = 2000.0),       // max charge current, A
+        "iDis"  to DidEntry("347C", 2, 0.1, 0.0, lo = 0.0, hi = 2000.0),       // max discharge current, A
+        "probeN" to DidEntry("341B", 1, 1.0, 0.0, lo = 0.0, hi = 64.0),        // temp probe count
     )
     // batches capped at 3 DIDs: 4-DID requests need a multiframe TX many clones refuse
     val batches = listOf(listOf("soc", "packV", "packI"), listOf("maxV", "minV", "maxN"), listOf("minN", "delta", "lv"))
     val slowKeys = listOf("soh", "maxT", "minT", "avgT", "bal",
-                          "iso", "tIn", "tOut", "pOut", "pReg", "iChg")
+                          "iso", "tIn", "tOut", "iChg", "iDis", "probeN")
 }
 
 data class Telemetry(
