@@ -143,6 +143,25 @@ lights off) to trim it per vehicle should a car deviate the way the Punch does.
   only a 13 mV spread the lowest cell genuinely changes) and on the Nexon (7 mV spread).
   `$34D5` also works on the Punch and agrees exactly with max − min (13 mV). `$340A`/`$340C`
   (temp probe numbers) are unsupported on the Punch but answer on the Tigor.
+- **The Tigor's MAX-index registers are unreliable; its MIN-index registers are fine.**
+  Across three 1.4.5 captures (driving / idle / charging, 24 rounds) `$3419` returned
+  7, 11, 19, 68, 80, 123, 144 and 156 on a 108S pack, flipping between them while the
+  max cell voltage moved < 2 mV. The same car reports `$340A` (max temp probe) = 8 while
+  `$341B` says only 6 probes exist. Both MIN registers are steady and in range
+  (`$341A` = 13, `$340C` = 1–2). TDS confirms `$3419` is BMS_MaxCellVoltNo, so the DID
+  is correct and the firmware is not. A full `$3400`–`$34FF` sweep (52 DIDs answer on the
+  Tigor) contains no other usable max-cell index. The app bounds probe numbers by `$341B`
+  and cell numbers by the series count, and hides what falls outside.
+- Tigor-only DIDs not in TDS: `$3404`, `$3407`, `$3408`, `$3416`, `$3418`, `$341C`,
+  `$3490`, `$3491`, `$3495`–`$3498`, `$34C1`–`$34C3`. `$3485` is BMS_RealTime and decodes
+  as YYMMDDHHMMSS (`260917145626` = 2026-09-17 14:56:26).
+- Power limits: use `$347B`/`$347C` (max allowed charge / discharge CURRENT, amps, ×0.1)
+  times pack voltage — 24.7 A charge and 133.3 A discharge on the Tigor, i.e. 9 kW and
+  47 kW against a 55 kW car. `$347D`–`$3480` are named "Power" by TDS but their Units
+  column says amps and they read 4.3 / 9.1 / 0.9 / 0.8 on the Tigor: unresolved, kept in
+  Tools only.
+- `$3479` bit 3 (0x08, VCU_Charging) sets while charging (0x14 → 0x1C), confirming the
+  bitfield decode on a passenger car.
 - `$3419` (max cell number) reports 144 on the Tigor's ~108-cell pack, and flips between 68,
   80 and 144 while the physical maximum is steady — so it is a channel address, not a 1..N
   index, on that car. `$341A` (min) reads a stable, plausible 13. The TDS row is flagged
