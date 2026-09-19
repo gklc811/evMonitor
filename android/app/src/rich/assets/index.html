@@ -43,8 +43,6 @@
   .hidden { display: none !important; }
   #viewDash { transition: opacity 1.6s, transform 0.8s ease-in-out; }
   #vPower { transition: color 0.8s ease; }
-  body.dim { background: #000; }
-  body.dim #viewDash { opacity: 0.28; }
 
   /* ---------- connect view ---------- */
   #viewConnect { display: flex; flex-direction: column; gap: 14px; padding-top: 22px; flex: 1; }
@@ -804,7 +802,7 @@ function installNativeBridge() {
   elm.disconnect = () => { EvNative.disconnect(); elm.connected = false; };
 }
 
-const APP_VER = "1.6.0";
+const APP_VER = "1.6.1";
 
 const S = {
   profile: null, view: "connect", night: false, polling: false, scanning: false,
@@ -818,7 +816,7 @@ const S = {
   rec: null,                               // active 95-100% AC recording window
   sess: null, chgm: null,                  // continuous sampler + charge-window meta
   sessMode: "default", chargeSince: 0, badDids: {}, pendingReport: null, focus: false,
-  wakeLock: null, dimTimer: null,
+  wakeLock: null,
   lastOdoAt: 0, lastSave: 0,
 };
 const $ = id => document.getElementById(id);
@@ -1228,7 +1226,6 @@ function tick() {
     if (target === S.pendState) S.pendStreak++; else { S.pendState = target; S.pendStreak = 1; }
     if (S.pendStreak >= 3 && S.powerState !== S.pendState) {
       S.powerState = S.pendState;
-      onPowerStateChange();
     }
   }
   /* session lo/hi ranges for the readouts */
@@ -1862,7 +1859,7 @@ function startMonitoring() {
   show("dash");
   queueFit();
   acquireWake();
-  resetDim();
+  startPixelShift();
   if (!S.polling) pollLoop();
 }
 /* wake lock held the whole time we're monitoring */
@@ -1881,13 +1878,25 @@ document.addEventListener("visibilitychange", () => {
     if (!elm.connected && !S.userDisc && !window.EvNative && store.get("evm_device")) scheduleReconnect();   // resume after a long screen-off
   }
 });
-/* passive dim after 30 s idle — same screen, tap to brighten.
-   While dimmed, the whole panel drifts a few px on a slow random walk
-   (OLED pixel-shift) so no glyph parks on the same pixels overnight. */
+/* The panel never dims. Burn-in protection is the pixel shift alone: the whole panel
+   drifts a few px on a slow random walk so no glyph parks on the same pixels for hours. */
 /* fit-to-viewport: the panel scales down (never scrolls, never clips) when the
    layout is taller than the screen — portrait and landscape alike */
 let fitScale = 1;
-const FIT_MAX = 1.9;          // a tablet is mostly empty margin otherwise
+let shiftX = 0, shiftY = 0;
+const FIT_MAX = 1.9;
+
+/* The burn-in drift and the fit scale both live on this one transform, so a single
+   function owns it. Writing either on its own used to wipe the other — which silently
+   cancelled the tablet scale-up. */
+function paintPanelTransform() {
+  const v = $("viewDash");
+  if (!v) return;
+  const parts = [];
+  if (shiftX || shiftY) parts.push(`translate(${shiftX}px, ${shiftY}px)`);
+  if (fitScale !== 1) parts.push(`scale(${fitScale})`);
+  v.style.transform = parts.join(" ");
+}          // a tablet is mostly empty margin otherwise
 
 /* The panel stretches to fill its flex parent, so scrollHeight reports the container,
    not the content. Measure what the children actually occupy. */
@@ -1935,54 +1944,35 @@ function fitViewport() {
          rides that bottom edge — scaling the stretched box would carry the buttons off the
          screen. Let it hug its content first, then magnify. */
       v.style.flex = "0 0 auto"; v.style.height = "auto";
-      v.style.transformOrigin = "top center"; v.style.transform = `scale(${k})`;
-    } else { fitScale = 1; }
+      v.style.transformOrigin = "top center"; paintPanelTransform();
+    } else { fitScale = 1; paintPanelTransform(); }
   } else if (k < 0.995) {
     fitScale = k;
     v.style.transformOrigin = "top center";
-    v.style.transform = `scale(${k})`;
-    v.style.width = (100 / k) + "%";              // widen first so the shrink nets out
+    v.style.width = (100 / k) + "%";               // widen first so the shrink nets out
     v.style.marginLeft = ((100 - 100 / k) / 2) + "%";
-  } else fitScale = 1;
+    paintPanelTransform();
+  } else { fitScale = 1; paintPanelTransform(); }
 }
 let fitTimer = null;
 function queueFit() { clearTimeout(fitTimer); fitTimer = setTimeout(fitViewport, 120); }
 window.addEventListener("resize", queueFit);
 window.addEventListener("orientationchange", queueFit);
 
-let dimTimer = null, shiftTimer = null;
+let shiftTimer = null;
 function startPixelShift() {
-  stopPixelShift();
+  if (shiftTimer) return;
   shiftTimer = setInterval(() => {
-    const x = Math.round(Math.random() * 16 - 8);
-    const y = Math.round(Math.random() * 16 - 8);
-    $("viewDash").style.transform = `translate(${x}px, ${y}px)` + (fitScale < 1 ? ` scale(${fitScale})` : "");
+    shiftX = Math.round(Math.random() * 16 - 8);
+    shiftY = Math.round(Math.random() * 16 - 8);
+    paintPanelTransform();
   }, 45000);
 }
 function stopPixelShift() {
   if (shiftTimer) { clearInterval(shiftTimer); shiftTimer = null; }
-  $("viewDash").style.transform = fitScale < 1 ? `scale(${fitScale})` : "";
+  shiftX = shiftY = 0;
+  paintPanelTransform();
 }
-/* Option A: never dim while discharging (driving); dim while charging or idle */
-function dimAllowed() { return S.powerState !== "discharge"; }
-function resetDim() {
-  document.body.classList.remove("dim");
-  stopPixelShift();
-  clearTimeout(dimTimer);
-  dimTimer = setTimeout(() => {
-    if (S.view === "dash" && dimAllowed()) { document.body.classList.add("dim"); startPixelShift(); }
-  }, 30000);
-}
-function onPowerStateChange() {
-  if (S.powerState === "discharge") {
-    document.body.classList.remove("dim");
-    stopPixelShift();
-    clearTimeout(dimTimer);
-  } else {
-    resetDim();
-  }
-}
-document.addEventListener("pointerdown", () => { if (S.view === "dash") resetDim(); });
 
 /* ============================ Report UI ============================ */
 const DC_COL = { soc: "#4d9fff", amp: "#c792ea", tp: "#f5b73d", dv: "#f89f9f" };
