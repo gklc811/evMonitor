@@ -804,7 +804,7 @@ function installNativeBridge() {
   elm.disconnect = () => { EvNative.disconnect(); elm.connected = false; };
 }
 
-const APP_VER = "1.5.2";
+const APP_VER = "1.6.0";
 
 const S = {
   profile: null, view: "connect", night: false, polling: false, scanning: false,
@@ -959,16 +959,35 @@ function setProfile(prof, how) {
   $("vCarName").textContent = prof.name.split(" (")[0] + " · ";
   $("vPackSpec").textContent = `${prof.kwh} kWh` + (prof.cells ? ` · ${prof.cells}S` : "");
 }
+/* Durable live state, written from the poll loop AND from a standalone timer — the link
+   dropping ends the poll loop, and that is exactly the moment worth recording. */
+function saveLive() {
+  S.lastSave = Date.now();
+  try {
+    store.set("evm_live", JSON.stringify({
+      t: S.lastSave, session: S.session, charging: S.charging, chargeSince: S.chargeSince,
+      sess: S.sess, chgm: S.chgm, rec: S.rec, reads: S.reads, misses: S.misses,
+    }));
+  } catch (e) {}
+}
+setInterval(() => { if (S.chgm || S.charging) saveLive(); }, 10000);
+
 function chargeLossWatchdog() {
   if (!S.charging) return;
   clearTimeout(S.chgLossTimer);
+  /* Near the top the pack drops the bus the moment it stops — that IS the end, so do not
+     sit out the full dropout grace. Lower down a lost link is far more likely to be a
+     passing BLE dropout, so wait. */
+  const nearFull = S.chgm && (S.chgm.socMax ?? 0) >= 97;
   S.chgLossTimer = setTimeout(() => {
-    if (!elm.connected && S.charging) {
-      logLine("charge end assumed — link lost while charging (adapter powered down)", "info");
-      S.charging = false;
-      finalizeCharge();
-    }
-  }, 180000);
+    if (!S.charging) return;
+    /* Re-attaching does not mean charging resumed. Only a genuine SOC rise cancels this. */
+    const stillRising = S.chgm && Date.now() - (S.chgm.lastRise || 0) < 90000;
+    if (elm.connected && stillRising) return;
+    logLine("charge end assumed — " + (elm.connected ? "no further SOC rise" : "link lost while charging"), "info");
+    S.charging = false;
+    finalizeCharge();
+  }, nearFull ? 60000 : 180000);
 }
 function onAdapterLost() {
   S.polling = false;
@@ -1182,6 +1201,16 @@ function tick() {
     if (!S.charging && S.chargeStreak >= 3) { S.charging = true; S.chargeSince = now; }
     if (S.charging && S.idleStreak >= 25) { S.charging = false; finalizeCharge(); }
   }
+  /* SOC has stopped climbing: the charge is over even if the pack still reports current.
+     Ten minutes near the top, twenty lower down where the taper is genuinely slow. */
+  if (S.charging && S.chgm && S.chgm.lastRise) {
+    const nearFull = (S.chgm.socMax ?? 0) >= 95;
+    if (now - S.chgm.lastRise > (nearFull ? 600000 : 1200000)) {
+      logLine("charge end — SOC stopped rising at " + fmt(S.chgm.socMax, 1) + "%", "info");
+      S.charging = false; S.chargeStreak = 0; S.idleStreak = 0;
+      finalizeCharge();
+    }
+  }
   /* full-charge watchdog: at 100% the BMS goes to sleep and reads freeze at the
      last charging current, so idle is never seen — 2 min of silence IS the end */
   if (S.charging && S.lastIAt && now - S.lastIAt > 120000) {
@@ -1191,13 +1220,7 @@ function tick() {
   }
   /* live-state snapshot every 15 s — durable (localStorage), so an interrupted
      charge can be recovered even after the app process dies overnight */
-  if (now - S.lastSave > 15000) {
-    S.lastSave = now;
-    store.set("evm_live", JSON.stringify({
-      t: now, session: S.session, charging: S.charging, chargeSince: S.chargeSince,
-      sess: S.sess, chgm: S.chgm, rec: S.rec, reads: S.reads, misses: S.misses,
-    }));
-  }
+  if (now - S.lastSave > 15000) saveLive();
   /* power-state machine: charge / discharge / idle, 3-sample dead-band
      so regen blips and stop-and-go never flicker the colour or the dim rule */
   if (t.packI != null) {
@@ -1250,7 +1273,8 @@ function tick() {
   /* charge window: arms after 60 s sustained charging (regen-proof) */
   if (S.charging && !S.chgm && now - S.chargeSince >= 60000) {
     S.chgm = { t: S.chargeSince, socStart: t.soc, eInStart: S.session.eIn, peakKw: 0, peakSoc: null,
-               tpStart: (t.avgT ?? t.maxT), tpMax: -999, dLo: null, dHi: null };
+               tpStart: (t.avgT ?? t.maxT), tpMax: -999, dLo: null, dHi: null,
+               socMax: t.soc, lastRise: now, vMax: t.maxV ?? null };
     logLine("charge window armed", "ok");
   }
   if (S.chgm) {
@@ -1269,6 +1293,14 @@ function tick() {
         S.chgm.balLast = b;
       }
     }
+    /* A charge is over when SOC stops climbing, whatever the current says. Some packs
+       freeze their last charging current instead of reporting zero, so current alone
+       never shows the end. */
+    if (t.soc != null) {
+      if (S.chgm.socMax == null) S.chgm.socMax = t.soc;
+      else if (t.soc > S.chgm.socMax + 0.05) { S.chgm.socMax = t.soc; S.chgm.lastRise = now; }
+    }
+    if (t.maxV != null && (S.chgm.vMax == null || t.maxV > S.chgm.vMax)) S.chgm.vMax = t.maxV;
     const tpm = t.avgT ?? t.maxT;
     if (tpm != null && tpm > S.chgm.tpMax) S.chgm.tpMax = tpm;
     if (dNow != null) {
@@ -1332,7 +1364,7 @@ function finalizeCharge() {
   const last = samples[samples.length - 1];
   const durMin = (last.t - m.t) / 60000;
   const eIn = S.session.eIn - m.eInStart;
-  const socRise = (last.soc != null && m.socStart != null) ? last.soc - m.socStart : 0;
+  const socRise = (m.socStart != null) ? (Math.max(last.soc ?? 0, m.socMax ?? 0) - m.socStart) : 0;
   // a genuine charge always raises SOC; regen while driving never does
   if (socRise < 0.5) {
     logLine("regen/transient discarded — no net SOC rise (" + socRise.toFixed(1) + "%, " + eIn.toFixed(2) + " kWh)", "info");
@@ -1341,7 +1373,8 @@ function finalizeCharge() {
   }
   const report = {
     id: Date.now(), type: "chg", start: m.t, end: last.t,
-    socStart: m.socStart, socEnd: last.soc,
+    socStart: m.socStart, socEnd: Math.max(last.soc ?? 0, m.socMax ?? 0) || last.soc,
+    topCellMv: m.vMax ?? null,
     peakKw: +m.peakKw.toFixed(1), peakSoc: m.peakSoc,
     eIn: +eIn.toFixed(2), avgKw: durMin > 0.5 ? +(eIn * 60 / durMin).toFixed(1) : null,
     tpStart: m.tpStart, tpMax: m.tpMax > -999 ? m.tpMax : null,
@@ -2274,7 +2307,21 @@ $("termIn").addEventListener("keydown", e => { if (e.key === "Enter") $("btnSend
 (function init() {
   try {
     const lv = JSON.parse(store.get("evm_live"));
-    if (lv && Date.now() - lv.t < 10 * 60000) {
+    /* An armed charge window untouched for 90 s belongs to a session that ended while the
+       app was closed, asleep or disconnected. Close it out now rather than restoring it
+       and hoping a watchdog gets the chance to run. */
+    if (lv && lv.chgm && lv.sess && lv.sess.samples && lv.sess.samples.length > 2 &&
+        Date.now() - lv.t > 90000 && Date.now() - lv.t < 48 * 3600000) {
+      Object.assign(S.session, lv.session || {});
+      S.sess = lv.sess; S.chgm = lv.chgm; S.rec = lv.rec || null;
+      S.powerState = "idle"; S.charging = false;
+      finalizeCharge();
+      logLine("charge report recovered — the session had ended while the app was closed", "ok");
+      S.sess = null; S.rec = null;
+      S.session = { start: 0, eOut: 0, eIn: 0, eRegen: 0, lastT: 0, lastP: 0, lastIAt: 0,
+                    odoStart: null, odoNow: null, range: {} };
+      store.set("evm_live", "");
+    } else if (lv && Date.now() - lv.t < 10 * 60000) {
       Object.assign(S.session, lv.session || {});
       S.charging = !!lv.charging; S.chargeSince = lv.chargeSince || 0;
       S.sess = lv.sess || null; S.chgm = lv.chgm || null; S.rec = lv.rec || null;
