@@ -97,8 +97,8 @@
     #vSoc { font-size: 66px !important; }
     #vSoh { font-size: 34px !important; }
     #vPower, #vCurr, #vPackV { font-size: 34px !important; }
-    #vMaxV, #vMinV { font-size: 44px !important; }
-    #vDelta { font-size: 34px !important; }
+    #vMaxV, #vMinV { font-size: 50px !important; }
+    #vDelta { font-size: 26px !important; }
     #vMaxN, #vMinN { font-size: 15px !important; }
     #vMaxT, #vMinT, #vAvgT { font-size: 56px !important; }
     #vLv, #vEOut, #vEIn, #vWhKm, #vTrip { font-size: 20px !important; }
@@ -109,8 +109,8 @@
     body.focus #vSoc { font-size: 80px !important; }
     body.focus #vSoh { font-size: 38px !important; }
     body.focus #vPower, body.focus #vCurr, body.focus #vPackV { font-size: 38px !important; }
-    body.focus #vMaxV, body.focus #vMinV { font-size: 46px !important; }
-    body.focus #vDelta { font-size: 38px !important; }
+    body.focus #vMaxV, body.focus #vMinV { font-size: 54px !important; }
+    body.focus #vDelta { font-size: 28px !important; }
     body.focus #vMaxN, body.focus #vMinN { font-size: 17px !important; }
     body.focus #vMaxT, body.focus #vMinT, body.focus #vAvgT { font-size: 68px !important; }
     body.focus #vLv, body.focus #vEOut, body.focus #vEIn, body.focus #vWhKm, body.focus #vTrip { font-size: 26px !important; }
@@ -137,8 +137,8 @@
     #vSoc { font-size: 34px !important; }
     #vSoh { font-size: 18px !important; }
     #vPower, #vCurr, #vPackV { font-size: 32px !important; }
-    #vMaxV, #vMinV { font-size: 42px !important; }
-    #vDelta { font-size: 34px !important; }
+    #vMaxV, #vMinV { font-size: 48px !important; }
+    #vDelta { font-size: 22px !important; }
     #vMaxN, #vMinN { font-size: 13px !important; }
     #vMaxT, #vMinT, #vAvgT { font-size: 40px !important; }
     #vLv, #vEOut, #vEIn, #vWhKm, #vTrip { font-size: 18px !important; }
@@ -147,8 +147,8 @@
     body.focus #vSoc { font-size: 48px !important; }
     body.focus #vSoh { font-size: 18px !important; }
     body.focus #vPower, body.focus #vCurr, body.focus #vPackV { font-size: 44px !important; }
-    body.focus #vMaxV, body.focus #vMinV { font-size: 52px !important; }
-    body.focus #vDelta { font-size: 42px !important; }
+    body.focus #vMaxV, body.focus #vMinV { font-size: 58px !important; }
+    body.focus #vDelta { font-size: 24px !important; }
     body.focus #vMaxN, body.focus #vMinN { font-size: 14px !important; }
     body.focus #vMaxT, body.focus #vMinT, body.focus #vAvgT { font-size: 50px !important; }
     body.focus #vLv, body.focus #vEOut, body.focus #vEIn, body.focus #vWhKm, body.focus #vTrip { font-size: 24px !important; }
@@ -161,8 +161,8 @@
     #vSoc { font-size: 46px !important; }
     #vSoh { font-size: 22px !important; }
     #vPower, #vCurr, #vPackV { font-size: 44px !important; }
-    #vMaxV, #vMinV { font-size: 54px !important; }
-    #vDelta { font-size: 44px !important; }
+    #vMaxV, #vMinV { font-size: 62px !important; }
+    #vDelta { font-size: 26px !important; }
     #vMaxN, #vMinN { font-size: 16px !important; }
     #vMaxT, #vMinT, #vAvgT { font-size: 72px !important; }
     #vLv, #vEOut, #vEIn, #vWhKm, #vTrip { font-size: 26px !important; }
@@ -172,8 +172,8 @@
     body.focus #vSoc { font-size: 48px !important; }
     body.focus #vSoh { font-size: 21px !important; }
     body.focus #vPower, body.focus #vCurr, body.focus #vPackV { font-size: 48px !important; }
-    body.focus #vMaxV, body.focus #vMinV { font-size: 54px !important; }
-    body.focus #vDelta { font-size: 46px !important; }
+    body.focus #vMaxV, body.focus #vMinV { font-size: 60px !important; }
+    body.focus #vDelta { font-size: 28px !important; }
     body.focus #vMaxT, body.focus #vMinT, body.focus #vAvgT { font-size: 84px !important; }
     body.focus #vLv, body.focus #vEOut, body.focus #vEIn, body.focus #vWhKm, body.focus #vTrip { font-size: 30px !important; }
     body.focus #socCard, body.focus #cellsCard, body.focus #tempCard { padding: 30px 18px !important; }
@@ -276,7 +276,14 @@
 
   <div class="card" id="cellsCard" style="padding: 13px 16px; display: flex; flex-direction: column; gap: 11px;">
     <div style="display: flex; justify-content: space-between; align-items: center;">
-      <div class="lbl tile-lbl" style="font-size: 11px;">Cell voltages</div>
+      <div style="display: flex; align-items: baseline; gap: 6px; min-width: 0;">
+        <div class="lbl tile-lbl" style="font-size: 11px;">Cell voltages</div>
+        <div style="display: flex; align-items: baseline; gap: 4px;">
+          <span class="lbl" style="font-size: 12px; color: var(--sec);">Δ</span>
+          <span class="num" style="font-weight: 600; color: var(--good);" id="vDelta">—</span>
+          <span class="num" style="font-size: 12px; color: var(--sec);">mV</span>
+        </div>
+      </div>
       <div style="display: flex; align-items: center; gap: 6px;">
       <div id="isoChip" class="hidden" style="display: flex; align-items: center; background: var(--panel2); border-radius: 999px; padding: 4px 10px;">
         <span class="lbl" style="font-size: 10px; font-weight: 600;" id="vIso">ISO —</span>
@@ -286,7 +293,7 @@
       </div>
       </div>
     </div>
-    <div style="display: grid; grid-template-columns: 1.15fr 0.9fr 1.15fr; gap: 8px; align-items: start;">
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start;">
       <div style="border-left: 2px solid var(--good); padding-left: 10px;">
         <div class="lbl tile-lbl">Max cell</div>
         <div style="display: flex; align-items: baseline; gap: 4px;">
@@ -296,15 +303,7 @@
         <div class="num" style="font-size: 11px; color: var(--good);" id="vMaxN">cell #—</div>
         <div class="num" style="font-size: 9.5px; color: var(--mut);" id="vMaxR"></div>
       </div>
-      <div style="text-align: center;">
-        <div class="lbl tile-lbl">Δ</div>
-        <div style="display: flex; align-items: baseline; gap: 3px; justify-content: center;">
-          <span class="num" style="font-size: 23px; font-weight: 600; color: var(--good);" id="vDelta">—</span>
-          <span class="num" style="font-size: 12px; color: var(--sec);">mV</span>
-        </div>
-        <div class="num" style="font-size: 11px; color: var(--mut);">&nbsp;</div>
-        <div class="num" style="font-size: 9.5px; color: var(--mut);" id="vDeltaR"></div>
-      </div>
+      <span class="hidden" id="vDeltaR"></span>
       <div style="border-right: 2px solid var(--crit); padding-right: 10px; text-align: right;">
         <div class="lbl tile-lbl">Min cell</div>
         <div style="display: flex; align-items: baseline; gap: 4px; justify-content: flex-end;">
@@ -805,7 +804,7 @@ function installNativeBridge() {
   elm.disconnect = () => { EvNative.disconnect(); elm.connected = false; };
 }
 
-const APP_VER = "1.5.1";
+const APP_VER = "1.5.2";
 
 const S = {
   profile: null, view: "connect", night: false, polling: false, scanning: false,
