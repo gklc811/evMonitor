@@ -87,15 +87,37 @@
   body.focus #vLvR, body.focus #vMaxTN, body.focus #vMinTN, body.focus #balChip,
   body.focus #vPowLim, body.focus #vChgLim, body.focus #isoChip, body.focus #vCoolant,
   body.focus #socCard .meter, body.focus #socCard > div:last-child { display: none !important; }
-  body.focus #vSoc { font-size: 54px !important; }
-  body.focus #vSoh { font-size: 30px !important; }
-  body.focus #vPower, body.focus #vCurr, body.focus #vPackV { font-size: 32px !important; }
-  body.focus #vMaxV, body.focus #vMinV, body.focus #vDelta { font-size: 30px !important; }
-  body.focus #vMaxN, body.focus #vMinN { font-size: 13px !important; }
-  body.focus #vMaxT, body.focus #vMinT, body.focus #vAvgT { font-size: 28px !important; }
-  body.focus #vLv { font-size: 24px !important; }
-  body.focus #vEOut, body.focus #vEIn, body.focus #vWhKm, body.focus #vTrip { font-size: 19px !important; }
   #btnFocus.on { background: var(--accent); color: #0b0e13; border-color: var(--accent); }
+
+  /* ---------- type scale ----------
+     Tuned against the running app at 430x935 and checked for clipping, not just height.
+     Width is the binding constraint: five monospace digits in a third-width tile cap out
+     near 44px, which is why the cells stop there while two-digit temperatures go further. */
+  @media (orientation: portrait) {
+    #vSoc { font-size: 66px !important; }
+    #vSoh { font-size: 34px !important; }
+    #vPower, #vCurr, #vPackV { font-size: 34px !important; }
+    #vMaxV, #vMinV { font-size: 44px !important; }
+    #vDelta { font-size: 34px !important; }
+    #vMaxN, #vMinN { font-size: 15px !important; }
+    #vMaxT, #vMinT, #vAvgT { font-size: 56px !important; }
+    #vLv, #vEOut, #vEIn, #vWhKm, #vTrip { font-size: 20px !important; }
+    #socCard, #cellsCard, #tempCard { padding: 24px 16px !important; }
+    #viewDash { gap: 16px !important; }
+    #viewDash > .grid3 > .card { padding: 21px 12px !important; }
+
+    body.focus #vSoc { font-size: 80px !important; }
+    body.focus #vSoh { font-size: 38px !important; }
+    body.focus #vPower, body.focus #vCurr, body.focus #vPackV { font-size: 38px !important; }
+    body.focus #vMaxV, body.focus #vMinV { font-size: 46px !important; }
+    body.focus #vDelta { font-size: 38px !important; }
+    body.focus #vMaxN, body.focus #vMinN { font-size: 17px !important; }
+    body.focus #vMaxT, body.focus #vMinT, body.focus #vAvgT { font-size: 68px !important; }
+    body.focus #vLv, body.focus #vEOut, body.focus #vEIn, body.focus #vWhKm, body.focus #vTrip { font-size: 26px !important; }
+    body.focus #socCard, body.focus #cellsCard, body.focus #tempCard { padding: 28px 16px !important; }
+    body.focus #viewDash { gap: 18px !important; }
+    body.focus #viewDash > .grid3 > .card { padding: 25px 12px !important; }
+  }
 
   /* ---------- landscape / wide layout ---------- */
   @media (orientation: landscape) and (min-width: 560px) {
@@ -108,13 +130,53 @@
     #viewDash > .grid3 { display: contents; }
     #viewDash > .grid3 > .card { grid-column: span 5; }
     /* rows 2-3 unchanged pairing */
-    #cellsCard, #tempCard, #lvCard, #sessCard { grid-column: span 10; }
+    #cellsCard, #tempCard { grid-column: span 10; }
+    #sessCard { grid-column: 1 / -1; }
     /* compact SOC tile */
     #socCard { padding: 10px 12px !important; gap: 5px !important; }
-    #vSoc { font-size: 26px !important; }
-    #vSoh { font-size: 15px !important; }
-    body.focus #vSoc, body.focus #vPower, body.focus #vCurr, body.focus #vPackV { font-size: 38px !important; }
-    body.focus #vSoh { font-size: 16px !important; }
+    #vSoc { font-size: 34px !important; }
+    #vSoh { font-size: 18px !important; }
+    #vPower, #vCurr, #vPackV { font-size: 32px !important; }
+    #vMaxV, #vMinV { font-size: 42px !important; }
+    #vDelta { font-size: 34px !important; }
+    #vMaxN, #vMinN { font-size: 13px !important; }
+    #vMaxT, #vMinT, #vAvgT { font-size: 40px !important; }
+    #vLv, #vEOut, #vEIn, #vWhKm, #vTrip { font-size: 18px !important; }
+    #vCarName { display: none !important; }   /* wraps the spec line in a quarter-width tile */
+
+    body.focus #vSoc { font-size: 48px !important; }
+    body.focus #vSoh { font-size: 18px !important; }
+    body.focus #vPower, body.focus #vCurr, body.focus #vPackV { font-size: 44px !important; }
+    body.focus #vMaxV, body.focus #vMinV { font-size: 52px !important; }
+    body.focus #vDelta { font-size: 42px !important; }
+    body.focus #vMaxN, body.focus #vMinN { font-size: 14px !important; }
+    body.focus #vMaxT, body.focus #vMinT, body.focus #vAvgT { font-size: 50px !important; }
+    body.focus #vLv, body.focus #vEOut, body.focus #vEIn, body.focus #vWhKm, body.focus #vTrip { font-size: 24px !important; }
+  }
+
+  /* A tablet in landscape is far taller than a phone in landscape (820 px against 430),
+     so the phone-landscape sizes leave most of the screen empty. The scaler cannot make
+     up the difference on its own — it is capped by width long before the height fills. */
+  @media (orientation: landscape) and (min-width: 560px) and (min-height: 700px) {
+    #vSoc { font-size: 46px !important; }
+    #vSoh { font-size: 22px !important; }
+    #vPower, #vCurr, #vPackV { font-size: 44px !important; }
+    #vMaxV, #vMinV { font-size: 54px !important; }
+    #vDelta { font-size: 44px !important; }
+    #vMaxN, #vMinN { font-size: 16px !important; }
+    #vMaxT, #vMinT, #vAvgT { font-size: 72px !important; }
+    #vLv, #vEOut, #vEIn, #vWhKm, #vTrip { font-size: 26px !important; }
+    #socCard, #cellsCard, #tempCard { padding: 24px 18px !important; }
+    #viewDash { gap: 14px !important; }
+
+    body.focus #vSoc { font-size: 48px !important; }
+    body.focus #vSoh { font-size: 21px !important; }
+    body.focus #vPower, body.focus #vCurr, body.focus #vPackV { font-size: 48px !important; }
+    body.focus #vMaxV, body.focus #vMinV { font-size: 54px !important; }
+    body.focus #vDelta { font-size: 46px !important; }
+    body.focus #vMaxT, body.focus #vMinT, body.focus #vAvgT { font-size: 84px !important; }
+    body.focus #vLv, body.focus #vEOut, body.focus #vEIn, body.focus #vWhKm, body.focus #vTrip { font-size: 30px !important; }
+    body.focus #socCard, body.focus #cellsCard, body.focus #tempCard { padding: 30px 18px !important; }
   }
 </style>
 </head>
@@ -184,7 +246,7 @@
     <div class="meter"><div id="socBar" style="width: 0%;"></div></div>
     <div style="display: flex; justify-content: space-between;">
       <span class="num" style="font-size: 11px; color: var(--mut);" id="vKwhLeft">—</span>
-      <span class="num" style="font-size: 11px; color: var(--mut);" id="vPackSpec">—</span>
+      <span class="num" style="font-size: 11px; color: var(--mut);" id="vCarName"></span><span class="num" style="font-size: 11px; color: var(--mut);" id="vPackSpec">—</span>
     </div>
   </div>
 
@@ -743,7 +805,7 @@ function installNativeBridge() {
   elm.disconnect = () => { EvNative.disconnect(); elm.connected = false; };
 }
 
-const APP_VER = "1.5.0";
+const APP_VER = "1.5.1";
 
 const S = {
   profile: null, view: "connect", night: false, polling: false, scanning: false,
@@ -895,7 +957,8 @@ function setProfile(prof, how) {
   $("dashCar").textContent = prof.name.split(" (")[0];
   $("dashSub").textContent = `BMS Live · ${prof.hdr}/${prof.rx}`;
   // with the title bar gone this line is the only thing naming the car
-  $("vPackSpec").textContent = `${prof.name.split(" (")[0]} · ${prof.kwh} kWh` + (prof.cells ? ` · ${prof.cells}S` : "");
+  $("vCarName").textContent = prof.name.split(" (")[0] + " · ";
+  $("vPackSpec").textContent = `${prof.kwh} kWh` + (prof.cells ? ` · ${prof.cells}S` : "");
 }
 function chargeLossWatchdog() {
   if (!S.charging) return;
@@ -1792,19 +1855,62 @@ document.addEventListener("visibilitychange", () => {
 /* fit-to-viewport: the panel scales down (never scrolls, never clips) when the
    layout is taller than the screen — portrait and landscape alike */
 let fitScale = 1;
+const FIT_MAX = 1.9;          // a tablet is mostly empty margin otherwise
+
+/* The panel stretches to fill its flex parent, so scrollHeight reports the container,
+   not the content. Measure what the children actually occupy. */
+function panelNeed(v) {
+  const st = getComputedStyle(v);
+  const kids = [...v.children].filter(e => e.getBoundingClientRect().height > 0);
+  if (!kids.length) return v.scrollHeight;
+  if (st.display === "grid") {          // landscape: rows share a line, so take the extent
+    let top = Infinity, bot = -Infinity;
+    for (const e of kids) { const r = e.getBoundingClientRect(); top = Math.min(top, r.top); bot = Math.max(bot, r.bottom); }
+    return Math.round(bot - top);
+  }
+  const gap = parseFloat(st.rowGap) || 0;   // portrait: the footer's auto margin would
+  let sum = 0;                              // otherwise make the extent equal the viewport
+  for (const e of kids) sum += e.getBoundingClientRect().height;
+  return Math.round(sum + gap * (kids.length - 1));
+}
+
 function fitViewport() {
   const v = $("viewDash");
   if (v.classList.contains("hidden")) return;
+  /* #viewDash animates its transform over 0.8 s. Clearing the transform starts that
+     animation rather than ending it, so measuring straight away reads the panel while it
+     is still partly scaled and the fit comes out wrong. Suspend the transition, force the
+     reset to take effect, measure, then let the new scale animate as usual. */
+  const prevTransition = v.style.transition;
+  v.style.transition = "none";
   v.style.transform = ""; v.style.width = ""; v.style.marginLeft = "";
+  v.style.flex = ""; v.style.height = "";
+  void v.offsetHeight;                       // flush the reset before reading any geometry
   const cs = getComputedStyle(document.body);
-  const avail = window.innerHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
-  const need = v.scrollHeight;
-  fitScale = Math.min(1, avail / Math.max(1, need));
-  if (fitScale < 0.995) {
+  const availH = window.innerHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+  const availW = document.documentElement.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  const need = panelNeed(v);
+  const baseW = v.getBoundingClientRect().width;
+  let k = availH / Math.max(1, need);
+  v.style.transition = prevTransition;       // the change below should animate
+  if (k > 1.02) {
+    /* grow into the spare room — a phone layout on a tablet is otherwise a small column
+       in a large screen. Capped by width too, so it never runs off the sides. */
+    k = Math.min(k, FIT_MAX, baseW > 0 ? availW / baseW : 1);
+    fitScale = k;
+    if (k > 1.02) {
+      /* The panel normally stretches to fill its flex parent, and the footer's auto margin
+         rides that bottom edge — scaling the stretched box would carry the buttons off the
+         screen. Let it hug its content first, then magnify. */
+      v.style.flex = "0 0 auto"; v.style.height = "auto";
+      v.style.transformOrigin = "top center"; v.style.transform = `scale(${k})`;
+    } else { fitScale = 1; }
+  } else if (k < 0.995) {
+    fitScale = k;
     v.style.transformOrigin = "top center";
-    v.style.transform = `scale(${fitScale})`;
-    v.style.width = (100 / fitScale) + "%";
-    v.style.marginLeft = ((100 - 100 / fitScale) / 2) + "%";
+    v.style.transform = `scale(${k})`;
+    v.style.width = (100 / k) + "%";              // widen first so the shrink nets out
+    v.style.marginLeft = ((100 - 100 / k) / 2) + "%";
   } else fitScale = 1;
 }
 let fitTimer = null;
