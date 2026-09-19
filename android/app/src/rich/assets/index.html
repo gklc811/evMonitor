@@ -88,9 +88,10 @@
   .chartlayout .cl-stats { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px;
     background: var(--bg); border: 1px solid var(--border); border-radius: 11px; padding: 9px 12px; }
   @media (orientation: landscape) and (min-width: 560px) { .chartlayout .cl-stats { grid-template-columns: 1fr; } }
-  .readout { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 8px;
+  .readout { display: grid; grid-template-columns: repeat(auto-fit, minmax(78px, 1fr)); gap: 8px 10px;
              background: var(--bg); border: 1px solid var(--border); border-radius: 11px; padding: 8px 11px; }
   @media (orientation: landscape) and (min-width: 560px) { .readout { grid-template-columns: 1fr 1fr; align-content: start; } }
+  .readout .rov { line-height: 1.15; }
   .readout .rok { font-family: 'Barlow Condensed', sans-serif; font-size: 9px; font-weight: 600; letter-spacing: .07em;
                   text-transform: uppercase; display: flex; align-items: center; gap: 4px; }
   .readout .rok i { width: 7px; height: 7px; border-radius: 50%; flex: 0 0 auto; }
@@ -119,7 +120,7 @@
     #vSoc { font-size: 66px !important; }
     #vSoh { font-size: 34px !important; }
     #vPower, #vCurr, #vPackV { font-size: 34px !important; }
-    #vMaxV, #vMinV { font-size: 50px !important; }
+    #vMaxV, #vMinV { font-size: 40px !important; }
     #vDelta { font-size: 26px !important; }
     #vMaxN, #vMinN { font-size: 15px !important; }
     #vMaxT, #vMinT, #vAvgT { font-size: 56px !important; }
@@ -131,7 +132,7 @@
     body.focus #vSoc { font-size: 80px !important; }
     body.focus #vSoh { font-size: 38px !important; }
     body.focus #vPower, body.focus #vCurr, body.focus #vPackV { font-size: 38px !important; }
-    body.focus #vMaxV, body.focus #vMinV { font-size: 54px !important; }
+    body.focus #vMaxV, body.focus #vMinV { font-size: 42px !important; }
     body.focus #vDelta { font-size: 28px !important; }
     body.focus #vMaxN, body.focus #vMinN { font-size: 17px !important; }
     body.focus #vMaxT, body.focus #vMinT, body.focus #vAvgT { font-size: 68px !important; }
@@ -169,7 +170,7 @@
     body.focus #vSoc { font-size: 48px !important; }
     body.focus #vSoh { font-size: 18px !important; }
     body.focus #vPower, body.focus #vCurr, body.focus #vPackV { font-size: 44px !important; }
-    body.focus #vMaxV, body.focus #vMinV { font-size: 58px !important; }
+    body.focus #vMaxV, body.focus #vMinV { font-size: 48px !important; }
     body.focus #vDelta { font-size: 24px !important; }
     body.focus #vMaxN, body.focus #vMinN { font-size: 14px !important; }
     body.focus #vMaxT, body.focus #vMinT, body.focus #vAvgT { font-size: 50px !important; }
@@ -183,7 +184,7 @@
     #vSoc { font-size: 46px !important; }
     #vSoh { font-size: 22px !important; }
     #vPower, #vCurr, #vPackV { font-size: 44px !important; }
-    #vMaxV, #vMinV { font-size: 62px !important; }
+    #vMaxV, #vMinV { font-size: 48px !important; }
     #vDelta { font-size: 26px !important; }
     #vMaxN, #vMinN { font-size: 16px !important; }
     #vMaxT, #vMinT, #vAvgT { font-size: 72px !important; }
@@ -194,7 +195,7 @@
     body.focus #vSoc { font-size: 48px !important; }
     body.focus #vSoh { font-size: 21px !important; }
     body.focus #vPower, body.focus #vCurr, body.focus #vPackV { font-size: 48px !important; }
-    body.focus #vMaxV, body.focus #vMinV { font-size: 60px !important; }
+    body.focus #vMaxV, body.focus #vMinV { font-size: 48px !important; }
     body.focus #vDelta { font-size: 28px !important; }
     body.focus #vMaxT, body.focus #vMinT, body.focus #vAvgT { font-size: 84px !important; }
     body.focus #vLv, body.focus #vEOut, body.focus #vEIn, body.focus #vWhKm, body.focus #vTrip { font-size: 30px !important; }
@@ -826,7 +827,7 @@ function installNativeBridge() {
   elm.disconnect = () => { EvNative.disconnect(); elm.connected = false; };
 }
 
-const APP_VER = "1.7.0";
+const APP_VER = "1.7.1";
 
 const S = {
   profile: null, view: "connect", night: false, polling: false, scanning: false,
@@ -1333,7 +1334,8 @@ function tick() {
     const iv = chgKw >= 15 ? 10000 : (S.charging ? 60000 : 20000);   // DC 10 s · slow AC 60 s · drive 20 s (~4 h window)
     if (now - S.sess.last >= iv) {
       S.sess.last = now;
-      S.sess.samples.push({ t: now, soc: t.soc, i: t.packI, v: t.packV, tp: (t.avgT ?? t.maxT), d: dNow });
+      S.sess.samples.push({ t: now, soc: t.soc, i: t.packI, v: t.packV, tp: (t.avgT ?? t.maxT), d: dNow,
+                            mx: t.maxV ?? null, mn: t.minV ?? null });
       if (S.sess.samples.length > 720) S.sess.samples.shift();
       if (S.liveOpen && !document.hidden) renderLive();
     }
@@ -2011,7 +2013,8 @@ function stopPixelShift() {
 }
 
 /* ============================ Report UI ============================ */
-const DC_COL = { soc: "#4d9fff", amp: "#c792ea", tp: "#f5b73d", dv: "#f89f9f" };
+const DC_COL = { soc: "#4d9fff", amp: "#c792ea", tp: "#f5b73d", dv: "#f89f9f",
+                 pv: "#9aa8c4", mx: "#3fd68c", mn: "#f26d6d" };
 
 function showChargeReport(r) {
   const el = $("reportSheet");
@@ -2105,10 +2108,25 @@ function buildDcChart(r, W, H) {
     return [lo, hi];
   };
   const socs = s.map(x => x.soc), amps = s.map(x => x.i != null ? -x.i : null),
-        tps = s.map(x => x.tp), dvs = s.map(x => x.d);
+        tps = s.map(x => x.tp), dvs = s.map(x => x.d),
+        pvs = s.map(x => x.v), mxs = s.map(x => x.mx), mns = s.map(x => x.mn);
   const sSoc = span(socs, 2), sAmp = span([0, ...amps], 5), sTp = span(tps, 1.5), sDv = span(dvs, 4);
+  const sPv = span(pvs, 2);
+  /* both cell edges share one scale, so the space between them reads as the spread */
+  const sCell = span([...mxs, ...mns], 12);
   const Y = (v, sp) => sp && v != null ? y1 - (v - sp[0]) / (sp[1] - sp[0]) * (y1 - y0) : null;
   const pts = (arr, sp) => s.map((x, i) => arr[i] != null ? `${X(x.t).toFixed(1)},${Y(arr[i], sp).toFixed(1)}` : null).filter(Boolean).join(" ");
+  /* the band between the two cell edges, drawn as one closed shape */
+  const bandPts = () => {
+    if (!sCell) return "";
+    const top = [], bot = [];
+    for (let i = 0; i < s.length; i++) {
+      if (mxs[i] == null || mns[i] == null) continue;
+      top.push(`${X(s[i].t).toFixed(1)},${Y(mxs[i], sCell).toFixed(1)}`);
+      bot.push(`${X(s[i].t).toFixed(1)},${Y(mns[i], sCell).toFixed(1)}`);
+    }
+    return top.length > 1 ? top.join(" ") + " " + bot.reverse().join(" ") : "";
+  };
   const txt = (x, y, t, c, a, sz) => `<text x="${x}" y="${y}" fill="${c}" font-size="${sz || 9}" text-anchor="${a || "start"}" font-family="IBM Plex Mono, monospace">${t}</text>`;
   const tickTxt = m => m >= 60 ? Math.floor(m / 60) + "h" + String(Math.round(m % 60)).padStart(2, "0") : Math.round(m) + " min";
   const durM = (t1 - t0) / 60000;
@@ -2136,6 +2154,10 @@ function buildDcChart(r, W, H) {
     ${txt(x0 - 6, y0 - 4, "SOC %", DC_COL.soc, "end", 8.5)}
     ${txt(x1 + 6, y0 - 4, "A", DC_COL.amp, "start", 8.5)}
     <line id="dcX" x1="0" y1="${y0}" x2="0" y2="${y1}" stroke="#93a1b8" stroke-dasharray="3 3" visibility="hidden"></line>
+    ${bandPts() ? `<polygon points="${bandPts()}" fill="${DC_COL.mx}" opacity="0.10"></polygon>` : ""}
+    <polyline points="${pts(pvs, sPv)}" fill="none" stroke="${DC_COL.pv}" stroke-width="1.4" opacity="0.8" stroke-linejoin="round"></polyline>
+    <polyline points="${pts(mns, sCell)}" fill="none" stroke="${DC_COL.mn}" stroke-width="1.5" opacity="0.9" stroke-linejoin="round"></polyline>
+    <polyline points="${pts(mxs, sCell)}" fill="none" stroke="${DC_COL.mx}" stroke-width="1.5" opacity="0.9" stroke-linejoin="round"></polyline>
     <polyline points="${pts(dvs, sDv)}" fill="none" stroke="${DC_COL.dv}" stroke-width="1.6" opacity="0.85" stroke-linejoin="round"></polyline>
     <polyline points="${pts(tps, sTp)}" fill="none" stroke="${DC_COL.tp}" stroke-width="1.6" opacity="0.85" stroke-linejoin="round"></polyline>
     <polyline points="${pts(amps, sAmp)}" fill="none" stroke="${DC_COL.amp}" stroke-width="2" stroke-linejoin="round"></polyline>
@@ -2144,14 +2166,19 @@ function buildDcChart(r, W, H) {
     <circle id="dcP2" r="4.5" fill="${DC_COL.amp}" stroke="#0b0e13" stroke-width="1.6" visibility="hidden"></circle>
     <circle id="dcP3" r="4" fill="${DC_COL.tp}" stroke="#0b0e13" stroke-width="1.6" visibility="hidden"></circle>
     <circle id="dcP4" r="4" fill="${DC_COL.dv}" stroke="#0b0e13" stroke-width="1.6" visibility="hidden"></circle>
+    <circle id="dcP5" r="3.5" fill="${DC_COL.pv}" stroke="#0b0e13" stroke-width="1.4" visibility="hidden"></circle>
+    <circle id="dcP6" r="3.5" fill="${DC_COL.mx}" stroke="#0b0e13" stroke-width="1.4" visibility="hidden"></circle>
+    <circle id="dcP7" r="3.5" fill="${DC_COL.mn}" stroke="#0b0e13" stroke-width="1.4" visibility="hidden"></circle>
   </svg>`;
-  return { svg, t0, t1, X, Y, sSoc, sAmp, sTp, sDv, x0, x1, W };
+  return { svg, t0, t1, X, Y, sSoc, sAmp, sTp, sDv, sPv, sCell, x0, x1, W };
 }
 
 /* The readout replaces the old end labels, which collided into an unreadable cluster
    whenever the four lines finished close together — exactly what a full charge does. */
 const RO_KEYS = [["soc", "SOC", "%", DC_COL.soc], ["amp", "Current", "A", DC_COL.amp],
-                 ["tp", "Avg temp", "°C", DC_COL.tp], ["dv", "ΔV", "mV", DC_COL.dv]];
+                 ["pv", "Pack", "V", DC_COL.pv], ["mx", "Max cell", "V", DC_COL.mx],
+                 ["mn", "Min cell", "V", DC_COL.mn], ["dv", "ΔV", "mV", DC_COL.dv],
+                 ["tp", "Avg temp", "°C", DC_COL.tp]];
 function readoutHtml() {
   return `<div class="readout cl-read" id="dcRead">` + RO_KEYS.map(([k, l, u, c]) =>
     `<div><div class="rok" style="color:${c}"><i style="background:${c}"></i>${l}</div>
@@ -2165,6 +2192,9 @@ function fillReadout(p, t0) {
   set("amp", p && p.i != null ? Math.round(-p.i) + u("A") : "—");
   set("tp", p && p.tp != null ? Math.round(p.tp) + u("°C") : "—");
   set("dv", p && p.d != null ? Math.round(p.d) + u("mV") : "—");
+  set("pv", p && p.v != null ? p.v.toFixed(1) + u("V") : "—");
+  set("mx", p && p.mx != null ? (p.mx / 1000).toFixed(3) + u("V") : "—");
+  set("mn", p && p.mn != null ? (p.mn / 1000).toFixed(3) + u("V") : "—");
   const at = $("dcAt");
   if (at) at.textContent = p && t0 != null ? "at " + Math.round((p.t - t0) / 60000) + " min" : "";
 }
@@ -2186,10 +2216,11 @@ function wireDcScrub(r, c) {
       if (v == null) { e.setAttribute("visibility", "hidden"); return; }
       e.setAttribute("cx", x); e.setAttribute("cy", c.Y(v, sp).toFixed(1)); e.setAttribute("visibility", "visible"); };
     put("dcP1", p.soc, c.sSoc); put("dcP2", p.i != null ? -p.i : null, c.sAmp); put("dcP3", p.tp, c.sTp); put("dcP4", p.d, c.sDv);
+    put("dcP5", p.v, c.sPv); put("dcP6", p.mx, c.sCell); put("dcP7", p.mn, c.sCell);
     fillReadout(p, c.t0);
   };
   const clear = () => {
-    for (const id of ["dcX", "dcP1", "dcP2", "dcP3", "dcP4"]) { const e = $(id); if (e) e.setAttribute("visibility", "hidden"); }
+    for (const id of ["dcX", "dcP1", "dcP2", "dcP3", "dcP4", "dcP5", "dcP6", "dcP7"]) { const e = $(id); if (e) e.setAttribute("visibility", "hidden"); }
     fillReadout(s[s.length - 1], c.t0);          // resting state is the latest sample, never blank
   };
   clear();
