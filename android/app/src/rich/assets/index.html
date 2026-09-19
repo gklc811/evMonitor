@@ -71,6 +71,30 @@
 
   /* ---------- overlays ---------- */
   .overlay { position: fixed; inset: 0; background: rgba(4,6,10,0.82); display: flex; align-items: flex-end; justify-content: center; z-index: 40; }
+  /* chart view: the sheet takes the whole screen so the plot can have all of it */
+  .overlay.full { align-items: stretch; background: var(--bg); }
+  .overlay.full .sheet { max-width: none; width: 100%; height: 100%; max-height: none;
+                         border: none; border-radius: 0; padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+                         gap: 8px; overflow: hidden; }
+  .chartlayout { flex: 1; min-height: 0; display: grid; gap: 8px;
+                 grid-template-columns: 1fr; grid-template-rows: auto minmax(0,1fr) auto;
+                 grid-template-areas: "stats" "chart" "read"; }
+  .chartlayout > .cl-stats { grid-area: stats; } .chartlayout > .cl-chart { grid-area: chart; min-height: 0; }
+  .chartlayout > .cl-read { grid-area: read; }
+  @media (orientation: landscape) and (min-width: 560px) {
+    .chartlayout { grid-template-columns: 196px minmax(0,1fr); grid-template-rows: auto minmax(0,1fr);
+                   grid-template-areas: "stats chart" "read chart"; }
+  }
+  .chartlayout .cl-stats { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px;
+    background: var(--bg); border: 1px solid var(--border); border-radius: 11px; padding: 9px 12px; }
+  @media (orientation: landscape) and (min-width: 560px) { .chartlayout .cl-stats { grid-template-columns: 1fr; } }
+  .readout { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 8px;
+             background: var(--bg); border: 1px solid var(--border); border-radius: 11px; padding: 8px 11px; }
+  @media (orientation: landscape) and (min-width: 560px) { .readout { grid-template-columns: 1fr 1fr; align-content: start; } }
+  .readout .rok { font-family: 'Barlow Condensed', sans-serif; font-size: 9px; font-weight: 600; letter-spacing: .07em;
+                  text-transform: uppercase; display: flex; align-items: center; gap: 4px; }
+  .readout .rok i { width: 7px; height: 7px; border-radius: 50%; flex: 0 0 auto; }
+  .readout .rov { font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }
   .sheet { background: var(--panel); border: 1px solid var(--border); border-radius: 18px 18px 0 0; width: 100%; max-width: 430px; max-height: 88vh; overflow-y: auto; padding: 18px 16px 26px; display: flex; flex-direction: column; gap: 12px; }
   table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
   td, th { padding: 6px 6px; border-bottom: 1px solid var(--border); text-align: left; }
@@ -357,7 +381,7 @@
       <button class="ghost" style="min-height: 30px; padding: 4px 10px; font-size: 10.5px;" id="btnTools">Tools</button>
     </span>
   </div>
-
+</div>
 
 <!-- ================= REPORT SHEET ================= -->
 <div class="overlay hidden" id="ovReport">
@@ -802,7 +826,7 @@ function installNativeBridge() {
   elm.disconnect = () => { EvNative.disconnect(); elm.connected = false; };
 }
 
-const APP_VER = "1.6.1";
+const APP_VER = "1.7.0";
 
 const S = {
   profile: null, view: "connect", night: false, polling: false, scanning: false,
@@ -1395,8 +1419,9 @@ function finalizeCharge() {
 function openLiveChart() {
   if (!S.sess) { logLine("no session data yet — connect first", "info"); return; }
   S.liveOpen = true;
-  renderLive();
+  $("ovReport").classList.add("full");        // chart view takes the whole screen
   openSheet($("ovReport"));
+  renderLive();                               // after the overlay is laid out, so the box measures true
 }
 function renderLive() {
   const c = S.sess;
@@ -1426,43 +1451,44 @@ function renderLive() {
   }
   const energyLbl = charging ? "Energy in" : "Energy out";
   const energyVal = charging ? (S.session.eIn - (m ? m.eInStart : 0)) : S.session.eOut;
-  const rep = { samples: c.samples };
-  const chart = c.samples.length > 2 ? buildDcChart(rep) : null;
   const mins = Math.round((Date.now() - c.start) / 60000);
   el.innerHTML = `
-    <div style="display:flex; justify-content:space-between; align-items:center;">
-      <div style="display:flex; align-items:center; gap:10px;">
-        <div class="lbl" style="font-size:16px; font-weight:700;">Session chart</div>
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+      <div style="display:flex; align-items:center; gap:9px; min-width:0;">
+        <div class="lbl" style="font-size:15px; font-weight:700;">Session chart</div>
         ${badge}
+        <span class="num" id="dcAt" style="font-size:10px; color:var(--mut);"></span>
       </div>
-      <button class="ghost" style="min-height:34px; padding:6px 12px;" onclick="closeSheets()">Close</button>
+      <button class="ghost" style="min-height:32px; padding:5px 12px; font-size:11px;" onclick="closeSheets()">Close</button>
     </div>
-    <div class="num" style="font-size:11px; color:var(--mut); margin-top:-6px;">started ${new Date(c.start).toTimeString().slice(0, 5)} · ${mins} min · sampling ${charging ? (isDc ? "10 s" : "60 s") : "20 s"}</div>
-    <div class="card" style="padding:12px 14px;">
-      <div style="display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px;">
-        <div><div class="lbl" style="font-size:9.5px; color:var(--mut);">Now</div><div class="num" style="font-size:15px; font-weight:600;" id="liveNow">${p != null ? Math.abs(p).toFixed(1) + " kW" : "—"}</div><div class="num" style="font-size:9px; color:var(--mut);" id="liveAmp">${t.packI != null ? Math.abs(t.packI).toFixed(1) + " A" : ""}</div></div>
-        <div><div class="lbl" style="font-size:9.5px; color:var(--mut);">${energyLbl}</div><div class="num" style="font-size:15px; font-weight:600;" id="liveEIn">${energyVal.toFixed(2)} kWh</div><div class="num" style="font-size:9px; color:var(--mut);">so far</div></div>
-        <div><div class="lbl" style="font-size:9.5px; color:var(--mut);">${thirdLbl}</div><div class="num" style="font-size:15px; font-weight:600;" id="liveEta">${third}</div><div class="num" style="font-size:9px; color:var(--mut);">${thirdSub}</div></div>
+    <div class="num" style="font-size:9.5px; color:var(--mut); margin-top:-4px;">started ${new Date(c.start).toTimeString().slice(0, 5)} · ${mins} min · sampling ${charging ? (isDc ? "10 s" : "60 s") : "20 s"} · touch the chart to scrub</div>
+    <div class="chartlayout">
+      <div class="cl-stats">
+        <div><div class="lbl" style="font-size:9px; color:var(--mut);">Now</div><div class="num" style="font-size:16px; font-weight:600;" id="liveNow">${p != null ? Math.abs(p).toFixed(1) + " kW" : "—"}</div><div class="num" style="font-size:9px; color:var(--mut);" id="liveAmp">${t.packI != null ? Math.abs(t.packI).toFixed(1) + " A" : ""}</div></div>
+        <div><div class="lbl" style="font-size:9px; color:var(--mut);">${energyLbl}</div><div class="num" style="font-size:16px; font-weight:600;" id="liveEIn">${energyVal.toFixed(2)} kWh</div><div class="num" style="font-size:9px; color:var(--mut);">so far</div></div>
+        <div><div class="lbl" style="font-size:9px; color:var(--mut);">${thirdLbl}</div><div class="num" style="font-size:16px; font-weight:600;" id="liveEta">${third}</div><div class="num" style="font-size:9px; color:var(--mut);">${thirdSub}</div></div>
       </div>
-    </div>
-    <div class="card" style="padding:13px 15px; display:flex; flex-direction:column; gap:4px;">
-      <div style="display:flex; gap:14px; align-items:center; flex-wrap:wrap;">
-        <span style="display:flex; align-items:center; gap:5px;"><span style="width:8px; height:8px; border-radius:50%; background:${DC_COL.soc};"></span><span class="lbl" style="font-size:9.5px; font-weight:600; color:var(--sec);">SOC</span></span>
-        <span style="display:flex; align-items:center; gap:5px;"><span style="width:8px; height:8px; border-radius:50%; background:${DC_COL.amp};"></span><span class="lbl" style="font-size:9.5px; font-weight:600; color:var(--sec);">Current</span></span>
-        <span style="display:flex; align-items:center; gap:5px;"><span style="width:8px; height:8px; border-radius:50%; background:${DC_COL.tp};"></span><span class="lbl" style="font-size:9.5px; font-weight:600; color:var(--sec);">Avg temp</span></span>
-        <span style="display:flex; align-items:center; gap:5px;"><span style="width:8px; height:8px; border-radius:50%; background:${DC_COL.dv};"></span><span class="lbl" style="font-size:9.5px; font-weight:600; color:var(--sec);">ΔV</span></span>
-      </div>
-      <div style="display:flex; justify-content:center; min-height:26px;">
-        <span class="num" id="dcChip" style="font-size:10.5px; background:var(--panel2); border:1px solid var(--border); border-radius:999px; padding:4px 12px;">touch the chart to read values</span>
-      </div>
-      ${chart ? chart.svg : `<div class="num" style="font-size:11px; color:var(--mut); text-align:center; padding:26px 0;">collecting samples — chart appears after a minute…</div>`}
-      <div class="num" style="font-size:9px; color:var(--mut);">Current is signed: regen rises above the drive line · touch to scrub</div>
-    </div>
-    <div style="margin-top:auto; text-align:center; padding-top:6px;">
-      <span class="num" style="font-size:10px; color:var(--mut);">Charge reports still save automatically when a charger stops</span>
+      <div class="cl-chart" id="chartBox"></div>
+      ${readoutHtml()}
     </div>`;
-  if (chart) wireDcScrub(rep, chart);
+  /* the plot is built to the pixel size of the box it lands in, so it fills whatever the
+     screen and orientation leave for it */
+  const box = $("chartBox");
+  const draw = () => {
+    const r2 = box.getBoundingClientRect();
+    if (r2.width < 40 || r2.height < 40) return;
+    if (c.samples.length <= 2) {
+      box.innerHTML = `<div class="num" style="font-size:11px; color:var(--mut); text-align:center; padding:26px 0;">collecting samples — the chart appears after a minute…</div>`;
+      return;
+    }
+    const rep = { samples: c.samples };
+    const chart = buildDcChart(rep, r2.width, r2.height);
+    box.innerHTML = chart.svg;
+    wireDcScrub(rep, chart);
+  };
+  requestAnimationFrame(draw);
 }
+
 
 /* sheets share one history entry so the system back button closes them
    instead of leaving the app */
@@ -1473,6 +1499,7 @@ function openSheet(ov) {
 }
 function closeSheets(viaPop) {
   for (const id of ["ovReport", "ovTools", "ovReports"]) $(id).classList.add("hidden");
+  $("ovReport").classList.remove("full");
   S.liveOpen = false;
   if (sheetOpen && !viaPop) { sheetOpen = false; try { history.back(); } catch (e) {} }
   else sheetOpen = false;
@@ -1958,6 +1985,15 @@ let fitTimer = null;
 function queueFit() { clearTimeout(fitTimer); fitTimer = setTimeout(fitViewport, 120); }
 window.addEventListener("resize", queueFit);
 window.addEventListener("orientationchange", queueFit);
+/* the plot is built to its box in pixels, so it has to be rebuilt when the box changes */
+let chartRedrawTimer = null;
+function queueChartRedraw() {
+  if (!S.liveOpen) return;
+  clearTimeout(chartRedrawTimer);
+  chartRedrawTimer = setTimeout(() => { if (S.liveOpen) renderLive(); }, 160);
+}
+window.addEventListener("resize", queueChartRedraw);
+window.addEventListener("orientationchange", queueChartRedraw);
 
 let shiftTimer = null;
 function startPixelShift() {
@@ -1979,9 +2015,9 @@ const DC_COL = { soc: "#4d9fff", amp: "#c792ea", tp: "#f5b73d", dv: "#f89f9f" };
 
 function showChargeReport(r) {
   const el = $("reportSheet");
-  const hm = ts => new Date(ts).toTimeString().slice(0, 5);
+  const hm = ts => { const d = new Date(ts); return isNaN(d) ? "—" : d.toTimeString().slice(0, 5); };
   const durMin = Math.round((r.end - r.start) / 60000);
-  const chart = r.samples && r.samples.length > 2 ? buildDcChart(r) : null;
+  const chart = r.samples && r.samples.length > 2 ? buildDcChart(r, 660, 330) : null;
   const isDc = (r.peakKw || 0) >= 20;
   const badge = isDc
     ? `<span class="lbl" style="font-size:10px; font-weight:700; color:#c792ea; border:1px solid rgba(199,146,234,0.4); background:rgba(199,146,234,0.08); border-radius:999px; padding:4px 10px;">DC · ${fmt(r.peakKw,1)} kW</span>`
@@ -2021,16 +2057,12 @@ function showChargeReport(r) {
       </div>
     </div>
     <div class="card" style="padding:13px 15px; display:flex; flex-direction:column; gap:4px;">
-      <div style="display:flex; gap:14px; align-items:center;">
-        <span style="display:flex; align-items:center; gap:5px;"><span style="width:8px; height:8px; border-radius:50%; background:${DC_COL.soc};"></span><span class="lbl" style="font-size:9.5px; font-weight:600; color:var(--sec);">SOC</span></span>
-        <span style="display:flex; align-items:center; gap:5px;"><span style="width:8px; height:8px; border-radius:50%; background:${DC_COL.amp};"></span><span class="lbl" style="font-size:9.5px; font-weight:600; color:var(--sec);">Current</span></span>
-        <span style="display:flex; align-items:center; gap:5px;"><span style="width:8px; height:8px; border-radius:50%; background:${DC_COL.tp};"></span><span class="lbl" style="font-size:9.5px; font-weight:600; color:var(--sec);">Avg temp</span></span>
-        <span style="display:flex; align-items:center; gap:5px;"><span style="width:8px; height:8px; border-radius:50%; background:${DC_COL.dv};"></span><span class="lbl" style="font-size:9.5px; font-weight:600; color:var(--sec);">ΔV</span></span>
+      <div style="display:flex; justify-content:space-between; align-items:baseline;">
+        <div class="lbl tile-lbl" style="font-size:10px;">Charge curve</div>
+        <span class="num" id="dcAt" style="font-size:9.5px; color:var(--mut);"></span>
       </div>
-      <div style="display:flex; justify-content:center; min-height:26px;">
-        <span class="num" id="dcChip" style="font-size:10.5px; background:var(--panel2); border:1px solid var(--border); border-radius:999px; padding:4px 12px;">touch the chart to read values</span>
-      </div>
-      ${chart ? chart.svg : ""}
+      <div style="height:250px;">${chart ? chart.svg : ""}</div>
+      ${readoutHtml()}
       <div class="num" style="font-size:9px; color:var(--mut);">Touch or drag to scrub · values snap to the nearest sample</div>
     </div>
     ${toc}
@@ -2058,10 +2090,13 @@ function showChargeReport(r) {
   if (chart) wireDcScrub(r, chart);
 }
 
-function buildDcChart(r) {
+function buildDcChart(r, W, H) {
+  W = Math.max(280, Math.round(W || 660)); H = Math.max(160, Math.round(H || 320));
+  const ml = 42, mr = 44, mt = 14, mb = 24;
+  const x0 = ml, x1 = W - mr, y0 = mt, y1 = H - mb;
   const s = r.samples;
   const t0 = s[0].t, t1 = Math.max(t0 + 1, s[s.length - 1].t);
-  const X = ts => 34 + (ts - t0) / (t1 - t0) * 288;
+  const X = ts => x0 + (ts - t0) / (t1 - t0) * (x1 - x0);
   const span = (arr, pad) => {
     const v = arr.filter(x => x != null);
     if (!v.length) return null;
@@ -2069,42 +2104,69 @@ function buildDcChart(r) {
     if (hi - lo < pad) { hi += pad; lo -= pad; }
     return [lo, hi];
   };
-  const socs = s.map(x => x.soc), amps = s.map(x => x.i != null ? -x.i : null), tps = s.map(x => x.tp), dvs = s.map(x => x.d);
+  const socs = s.map(x => x.soc), amps = s.map(x => x.i != null ? -x.i : null),
+        tps = s.map(x => x.tp), dvs = s.map(x => x.d);
   const sSoc = span(socs, 2), sAmp = span([0, ...amps], 5), sTp = span(tps, 1.5), sDv = span(dvs, 4);
-  const Y = (v, sp) => sp && v != null ? 118 - (v - sp[0]) / (sp[1] - sp[0]) * 104 : null;
+  const Y = (v, sp) => sp && v != null ? y1 - (v - sp[0]) / (sp[1] - sp[0]) * (y1 - y0) : null;
   const pts = (arr, sp) => s.map((x, i) => arr[i] != null ? `${X(x.t).toFixed(1)},${Y(arr[i], sp).toFixed(1)}` : null).filter(Boolean).join(" ");
-  const last = s[s.length - 1];
-  const lbl = (x, y, txt, col, anchor) => `<text x="${x}" y="${y}" fill="${col}" font-size="9" text-anchor="${anchor || "start"}" font-family="IBM Plex Mono, monospace">${txt}</text>`;
+  const txt = (x, y, t, c, a, sz) => `<text x="${x}" y="${y}" fill="${c}" font-size="${sz || 9}" text-anchor="${a || "start"}" font-family="IBM Plex Mono, monospace">${t}</text>`;
   const tickTxt = m => m >= 60 ? Math.floor(m / 60) + "h" + String(Math.round(m % 60)).padStart(2, "0") : Math.round(m) + " min";
   const durM = (t1 - t0) / 60000;
-  let svg = `<svg id="dcSvg" viewBox="0 0 330 150" width="100%" height="185" style="touch-action:none;">
-    <line x1="34" y1="12" x2="34" y2="118" stroke="#232d40"></line>
-    <line x1="34" y1="118" x2="322" y2="118" stroke="#232d40"></line>
-    <line id="dcX" x1="0" y1="12" x2="0" y2="118" stroke="#5c6b84" stroke-dasharray="3 3" visibility="hidden"></line>
-    <polyline points="${pts(socs, sSoc)}" fill="none" stroke="${DC_COL.soc}" stroke-width="2" stroke-linejoin="round"></polyline>
+
+  /* horizontal grid, carrying the two axes that matter: SOC on the left, current on the right */
+  let grid = "";
+  const ROWS = 4;
+  for (let i = 0; i <= ROWS; i++) {
+    const y = y0 + (y1 - y0) * i / ROWS;
+    grid += `<line x1="${x0}" y1="${y.toFixed(1)}" x2="${x1}" y2="${y.toFixed(1)}" stroke="#1a2231"></line>`;
+    if (sSoc) grid += txt(x0 - 6, y + 3, Math.round(sSoc[1] - (sSoc[1] - sSoc[0]) * i / ROWS), DC_COL.soc, "end");
+    if (sAmp) grid += txt(x1 + 6, y + 3, Math.round(sAmp[1] - (sAmp[1] - sAmp[0]) * i / ROWS), DC_COL.amp, "start");
+  }
+  const COLS = 4;
+  for (let i = 0; i <= COLS; i++) {
+    const x = x0 + (x1 - x0) * i / COLS;
+    if (i) grid += `<line x1="${x.toFixed(1)}" y1="${y0}" x2="${x.toFixed(1)}" y2="${y1}" stroke="#151c29"></line>`;
+    grid += txt(x, y1 + 16, tickTxt(durM * i / COLS), "#5c6b84", i === 0 ? "start" : (i === COLS ? "end" : "middle"));
+  }
+
+  const svg = `<svg id="dcSvg" viewBox="0 0 ${W} ${H}" width="100%" height="100%" preserveAspectRatio="none" style="touch-action:none; display:block;">
+    ${grid}
+    <line x1="${x0}" y1="${y0}" x2="${x0}" y2="${y1}" stroke="#232d40"></line>
+    <line x1="${x0}" y1="${y1}" x2="${x1}" y2="${y1}" stroke="#232d40"></line>
+    ${txt(x0 - 6, y0 - 4, "SOC %", DC_COL.soc, "end", 8.5)}
+    ${txt(x1 + 6, y0 - 4, "A", DC_COL.amp, "start", 8.5)}
+    <line id="dcX" x1="0" y1="${y0}" x2="0" y2="${y1}" stroke="#93a1b8" stroke-dasharray="3 3" visibility="hidden"></line>
+    <polyline points="${pts(dvs, sDv)}" fill="none" stroke="${DC_COL.dv}" stroke-width="1.6" opacity="0.85" stroke-linejoin="round"></polyline>
+    <polyline points="${pts(tps, sTp)}" fill="none" stroke="${DC_COL.tp}" stroke-width="1.6" opacity="0.85" stroke-linejoin="round"></polyline>
     <polyline points="${pts(amps, sAmp)}" fill="none" stroke="${DC_COL.amp}" stroke-width="2" stroke-linejoin="round"></polyline>
-    <polyline points="${pts(tps, sTp)}" fill="none" stroke="${DC_COL.tp}" stroke-width="2" stroke-linejoin="round"></polyline>
-    <polyline points="${pts(dvs, sDv)}" fill="none" stroke="${DC_COL.dv}" stroke-width="2" stroke-linejoin="round"></polyline>`;
-  // right-edge end labels, de-collided: collect (y, text, colour), then space them >=11px apart
-  const ends = [];
-  if (last.soc != null) ends.push({ y: Y(last.soc, sSoc), tx: last.soc.toFixed(0) + "%", c: DC_COL.soc });
-  if (last.i != null)   ends.push({ y: Y(-last.i, sAmp),  tx: Math.round(-last.i) + " A", c: DC_COL.amp });
-  if (last.tp != null)  ends.push({ y: Y(last.tp, sTp),   tx: Math.round(last.tp) + " °C", c: DC_COL.tp });
-  if (last.d != null)   ends.push({ y: Y(last.d, sDv),    tx: Math.round(last.d) + " mV", c: DC_COL.dv });
-  ends.sort((a, b) => a.y - b.y);
-  for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 11) ends[i].y = ends[i - 1].y + 11;
-  for (const e of ends) svg += lbl(320, Math.min(116, Math.max(10, e.y)), e.tx, e.c, "end");
-  const ampMax = Math.max(...amps.filter(x => x != null), 0);
-  if (ampMax) svg += lbl(40, 10, Math.round(ampMax) + " A peak", DC_COL.amp);
-  svg += `<circle id="dcP1" r="4" fill="${DC_COL.soc}" stroke="#0b0e13" stroke-width="1.5" visibility="hidden"></circle>
-    <circle id="dcP2" r="4" fill="${DC_COL.amp}" stroke="#0b0e13" stroke-width="1.5" visibility="hidden"></circle>
-    <circle id="dcP3" r="4" fill="${DC_COL.tp}" stroke="#0b0e13" stroke-width="1.5" visibility="hidden"></circle>
-    <circle id="dcP4" r="4" fill="${DC_COL.dv}" stroke="#0b0e13" stroke-width="1.5" visibility="hidden"></circle>
-    ${lbl(34, 132, "0", "#5c6b84", "middle")}
-    ${lbl(178, 132, tickTxt(durM / 2), "#5c6b84", "middle")}
-    ${lbl(322, 132, tickTxt(durM), "#5c6b84", "end")}
+    <polyline points="${pts(socs, sSoc)}" fill="none" stroke="${DC_COL.soc}" stroke-width="2.4" stroke-linejoin="round"></polyline>
+    <circle id="dcP1" r="4.5" fill="${DC_COL.soc}" stroke="#0b0e13" stroke-width="1.6" visibility="hidden"></circle>
+    <circle id="dcP2" r="4.5" fill="${DC_COL.amp}" stroke="#0b0e13" stroke-width="1.6" visibility="hidden"></circle>
+    <circle id="dcP3" r="4" fill="${DC_COL.tp}" stroke="#0b0e13" stroke-width="1.6" visibility="hidden"></circle>
+    <circle id="dcP4" r="4" fill="${DC_COL.dv}" stroke="#0b0e13" stroke-width="1.6" visibility="hidden"></circle>
   </svg>`;
-  return { svg, t0, t1, X, Y, sSoc, sAmp, sTp, sDv };
+  return { svg, t0, t1, X, Y, sSoc, sAmp, sTp, sDv, x0, x1, W };
+}
+
+/* The readout replaces the old end labels, which collided into an unreadable cluster
+   whenever the four lines finished close together — exactly what a full charge does. */
+const RO_KEYS = [["soc", "SOC", "%", DC_COL.soc], ["amp", "Current", "A", DC_COL.amp],
+                 ["tp", "Avg temp", "°C", DC_COL.tp], ["dv", "ΔV", "mV", DC_COL.dv]];
+function readoutHtml() {
+  return `<div class="readout cl-read" id="dcRead">` + RO_KEYS.map(([k, l, u, c]) =>
+    `<div><div class="rok" style="color:${c}"><i style="background:${c}"></i>${l}</div>
+      <div class="rov" id="ro_${k}" style="color:${c}">—</div></div>`).join("") + `</div>`;
+}
+function fillReadout(p, t0) {
+  if (!$("dcRead")) return;
+  const set = (k, v) => { const e = $("ro_" + k); if (e) e.innerHTML = v; };
+  const u = t => `<span style="font-size:10px; color:var(--sec)"> ${t}</span>`;
+  set("soc", p && p.soc != null ? p.soc.toFixed(1) + u("%") : "—");
+  set("amp", p && p.i != null ? Math.round(-p.i) + u("A") : "—");
+  set("tp", p && p.tp != null ? Math.round(p.tp) + u("°C") : "—");
+  set("dv", p && p.d != null ? Math.round(p.d) + u("mV") : "—");
+  const at = $("dcAt");
+  if (at) at.textContent = p && t0 != null ? "at " + Math.round((p.t - t0) / 60000) + " min" : "";
 }
 
 function wireDcScrub(r, c) {
@@ -2114,9 +2176,8 @@ function wireDcScrub(r, c) {
   const move = ev => {
     const rect = svg.getBoundingClientRect();
     if (!rect.width) return;
-    const vx = (ev.clientX - rect.left) / rect.width * 330;
-    if (vx < 30 || vx > 326) { clear(); return; }
-    const ts = c.t0 + (Math.min(322, Math.max(34, vx)) - 34) / 288 * (c.t1 - c.t0);
+    const vx = (ev.clientX - rect.left) / rect.width * c.W;
+    const ts = c.t0 + (Math.min(c.x1, Math.max(c.x0, vx)) - c.x0) / (c.x1 - c.x0) * (c.t1 - c.t0);
     let best = 0, bd = Infinity;
     for (let i = 0; i < s.length; i++) { const dd = Math.abs(s[i].t - ts); if (dd < bd) { bd = dd; best = i; } }
     const p = s[best], x = c.X(p.t).toFixed(1);
@@ -2125,16 +2186,13 @@ function wireDcScrub(r, c) {
       if (v == null) { e.setAttribute("visibility", "hidden"); return; }
       e.setAttribute("cx", x); e.setAttribute("cy", c.Y(v, sp).toFixed(1)); e.setAttribute("visibility", "visible"); };
     put("dcP1", p.soc, c.sSoc); put("dcP2", p.i != null ? -p.i : null, c.sAmp); put("dcP3", p.tp, c.sTp); put("dcP4", p.d, c.sDv);
-    const mins = Math.round((p.t - c.t0) / 60000);
-    $("dcChip").innerHTML = `${mins} min · <span style="color:${DC_COL.soc}">${p.soc != null ? p.soc.toFixed(1) + "%" : "—"}</span> · ` +
-      `<span style="color:${DC_COL.amp}">${p.i != null ? Math.round(-p.i) + " A" : "—"}</span> · ` +
-      `<span style="color:${DC_COL.tp}">${p.tp != null ? Math.round(p.tp) + " °C" : "—"}</span> · ` +
-      `<span style="color:${DC_COL.dv}">${p.d != null ? Math.round(p.d) + " mV" : "—"}</span>`;
+    fillReadout(p, c.t0);
   };
   const clear = () => {
-    for (const id of ["dcX", "dcP1", "dcP2", "dcP3", "dcP4"]) $(id).setAttribute("visibility", "hidden");
-    $("dcChip").textContent = "touch the chart to read values";
+    for (const id of ["dcX", "dcP1", "dcP2", "dcP3", "dcP4"]) { const e = $(id); if (e) e.setAttribute("visibility", "hidden"); }
+    fillReadout(s[s.length - 1], c.t0);          // resting state is the latest sample, never blank
   };
+  clear();
   svg.addEventListener("pointerdown", ev => { move(ev); try { svg.setPointerCapture(ev.pointerId); } catch (e) {} });
   svg.addEventListener("pointermove", ev => { if (ev.buttons) move(ev); });
 }
